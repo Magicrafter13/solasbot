@@ -1,0 +1,7 @@
+# Git
+/.git/
+/.gitignore
+/.gitlab-ci.yml
+
+# Python
+/venv/

@@ -1,0 +1,5 @@
+"""Bot configuration."""
+
+MAX_ALLOWED_BAN_ROLE_ID = 9813589165928698248
+STAFF_ROLE_ID = 9128642689240684734
+TOKEN = 'SLKFdjkjsfdLSKDF.fskjfSKFJflSJF_ksjfdlLs.sdfkjslkfjsLSKDkd.d.sKJSlsd_jAL'

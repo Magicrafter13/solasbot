@@ -1,0 +1,7 @@
+# Python
+/venv/
+/__pycache__/
+
+# Testing
+/users.db
+/config.py

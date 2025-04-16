@@ -1,0 +1,7 @@
+services:
+  solasbot:
+    image: registry.gitlab.matthewrease.net/matthew/solasbot:latest
+    volumes:
+      - /etc/solasbot/config.py:/app/config.py
+      - /etc/solasbot/users.db:/app/users.db
+      - /etc/localtime:/etc/localtime
