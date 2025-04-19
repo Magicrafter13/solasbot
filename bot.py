@@ -8,6 +8,7 @@ import sys
 from datetime import datetime, timedelta
 from typing import Optional
 
+import discord
 from discord import app_commands, Client, Forbidden, Guild, Intents, Interaction, Member, NotFound
 
 from config import MAX_ALLOWED_BAN_ROLE_ID as ban_role_id, STAFF_ROLE_ID as role_id, TOKEN
@@ -34,27 +35,60 @@ CURSOR.execute('''
         date TIMESTAMP
     );''')
 
+# Helper functions
+
+async def try_authorization(interaction: Interaction, user: Optional[Member]=None) -> bool:
+    """Check if user is authorized to run command, inform them if they aren't."""
+    # Check that they are an administrator/moderator
+    if not role_id in [role.id for role in interaction.user.roles]:
+        await interaction.response.send_message(
+            'You are not authorized to use this command!',
+            ephemeral=True)
+        return False
+    # If the interaction involves another user, make sure that they are within the bot's
+    # jurisdiction
+    if user:
+        guild_roles = [role.id for role in interaction.guild.roles]
+        if guild_roles.index(user.roles[-1].id) > guild_roles.index(ban_role_id):
+            await interaction.response.send_message(
+                'You are not allowed to ban this user due to their roles.',
+                ephemeral=True)
+            return False
+    return True
+
+async def send_dm(user: Member, message: str) -> bool:
+    """Send a DM to a user (creating the channel if necessary)."""
+    dm = user.dm_channel
+    if not user.dm_channel:
+        dm = await user.create_dm()
+    try:
+        await dm.send(message)
+    except discord.HTTPException as _e:
+        print(_e)
+        return False
+    except discord.Forbidden as _e:
+        print(_e)
+        return False
+    except discord.NotFound as _e:
+        print(_e)
+        return False
+    return True
+
+# Bot commands
+
 @tree.command(name='ban', description='6 month ban')
 @app_commands.describe(user='Username to ban.', reason='Optional reason for banning.')
 async def ban(interaction: Interaction, user: Member, reason: Optional[str]='none given'):
     """Add user to ban database, and then bans them."""
-    # Make sure user is authorized to run command
-    if not role_id in [role.id for role in interaction.user.roles]:
-        return await interaction.response.send_message(
-            'You are not authorized to use this command!',
-            ephemeral=True)
-    guild_roles = [role.id for role in interaction.guild.roles]
-    if guild_roles.index(user.roles[-1].id) > guild_roles.index(ban_role_id):
-        return await interaction.response.send_message(
-            'You are not allowed to ban this user due to their roles.',
-            ephemeral=True)
+    if not try_authorization(interaction, user):
+        return
 
-    dm = user.dm_channel
-    if not user.dm_channel:
-        dm = await user.create_dm()
-
-    await dm.send(
-        f'You have receive a 6-month ban from The Solas Council.\nGiven reason:\n> {reason}')
+    # DM banee
+    if not await send_dm(
+        user,
+        f'You have receive a 6-month ban from The Solas Council.\nGiven reason:\n> {reason}'
+    ):
+        await interaction.message.channel.send(f'Failed to DM {user}, check logs.')
 
     # Add to database
     CURSOR.execute(
@@ -75,6 +109,32 @@ async def ban(interaction: Interaction, user: Member, reason: Optional[str]='non
 
     return await interaction.response.send_message(
         f'Banned {user} (`{user.id}`) with reason `{reason}`.')
+
+@tree.command(name='kick', description='Kick someone from the server.')
+@app_commands.describe(user='Member to kick.', reason='Optional reason for kicking.')
+async def kick(interaction: Interaction, user: Member, reason: Optional[str]='none given'):
+    """Kick user, and tell them why."""
+    if not try_authorization(interaction, user):
+        return
+
+    # DM banee
+    if not await send_dm(
+        user,
+        f'You have been kicked from The Solas Council.\nGiven reason:\n> {reason}'
+    ):
+        await interaction.message.channel.send(f'Failed to DM {user}, check logs.')
+
+    # Kick user
+    try:
+        interaction.guild.kick(user, reason=reason)
+    except discord.Forbidden as _e:
+        print(_e)
+        return await interaction.response.send_message(f'Lacking permissions to ban {user}!')
+
+    return await interaction.response.send_message(
+        f'Kicked {user} (`{user.id}`) with reason `{reason}`.')
+
+# Non commands
 
 async def unban_users():
     """Wait until midnight, then unban relevant users."""
