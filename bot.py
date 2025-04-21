@@ -59,9 +59,9 @@ async def try_authorization(interaction: Interaction, user: Optional[Member]=Non
 async def send_dm(user: Member, message: str) -> bool:
     """Send a DM to a user (creating the channel if necessary)."""
     dm = user.dm_channel
-    if not user.dm_channel:
-        dm = await user.create_dm()
     try:
+        if not user.dm_channel:
+            dm = await user.create_dm()
         await dm.send(message)
     except discord.HTTPException as _e:
         print(_e)
