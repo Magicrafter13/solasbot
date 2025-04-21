@@ -88,7 +88,7 @@ async def ban(interaction: Interaction, user: Member, reason: Optional[str]='non
         user,
         f'You have receive a 6-month ban from The Solas Council.\nGiven reason:\n> {reason}'
     ):
-        await interaction.message.channel.send(f'Failed to DM {user}, check logs.')
+        await interaction.channel.send(f'Failed to DM {user}, check logs.')
 
     # Add to database
     CURSOR.execute(
@@ -122,7 +122,7 @@ async def kick(interaction: Interaction, user: Member, reason: Optional[str]='no
         user,
         f'You have been kicked from The Solas Council.\nGiven reason:\n> {reason}'
     ):
-        await interaction.message.channel.send(f'Failed to DM {user}, check logs.')
+        await interaction.channel.send(f'Failed to DM {user}, check logs.')
 
     # Kick user
     try:
@@ -167,7 +167,7 @@ async def timeout(
         user,
         f'You have been timed out in The Solas Council.\nGiven reason:\n> {reason}'
     ):
-        await interaction.message.channel.send(f'Failed to DM {user}, check logs.')
+        await interaction.channel.send(f'Failed to DM {user}, check logs.')
 
     # Timeout user
     try:
