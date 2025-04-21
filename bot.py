@@ -9,7 +9,7 @@ from datetime import datetime, timedelta
 from typing import Optional
 
 import discord
-from discord import app_commands, Client, Forbidden, Guild, Intents, Interaction, Member, NotFound
+from discord import app_commands, Client, Guild, Intents, Interaction, Member
 
 from config import MAX_ALLOWED_BAN_ROLE_ID as ban_role_id, STAFF_ROLE_ID as role_id, TOKEN
 
@@ -104,7 +104,7 @@ async def ban(interaction: Interaction, user: Member, reason: Optional[str]='non
     # Ban user
     try:
         await interaction.guild.ban(user, reason=reason)
-    except Forbidden:
+    except discord.Forbidden:
         return await interaction.response.send_message(f'Lacking permissions to ban {user}!')
 
     return await interaction.response.send_message(
@@ -127,12 +127,56 @@ async def kick(interaction: Interaction, user: Member, reason: Optional[str]='no
     # Kick user
     try:
         interaction.guild.kick(user, reason=reason)
-    except discord.Forbidden as _e:
-        print(_e)
-        return await interaction.response.send_message(f'Lacking permissions to ban {user}!')
+    except discord.Forbidden:
+        return await interaction.response.send_message(f'Lacking permissions to kick {user}!')
 
     return await interaction.response.send_message(
         f'Kicked {user} (`{user.id}`) with reason `{reason}`.')
+
+SOLAS_TIMEOUTS = {
+    '1h': timedelta(hours=1),
+    '24h': timedelta(days=1),
+    '1w': timedelta(weeks=1),
+    '10m': timedelta(minutes=10)
+}
+
+@tree.command(name='timeout', description='Silence a user from participating for a while.')
+@app_commands.describe(
+    user='Member to timeout.',
+    time='How long to keep user timed out.',
+    reason='Optional reason for timeout.'
+)
+@app_commands.choices(time=[
+    app_commands.Choice(name='1 Hour', value='1h'),
+    app_commands.Choice(name='24 Hours', value='24h'),
+    app_commands.Choice(name='1 Week', value='1w'),
+    app_commands.Choice(name='10 Minutes', value='10m')
+])
+async def timeout(
+    interaction: Interaction,
+    user: Member,
+    time: str,
+    reason: Optional[str]='none given'
+):
+    """Timeout user, and tell them why."""
+    if not try_authorization(interaction, user):
+        return
+
+    # DM rascal
+    if not await send_dm(
+        user,
+        f'You have been timed out in The Solas Council.\nGiven reason:\n> {reason}'
+    ):
+        await interaction.message.channel.send(f'Failed to DM {user}, check logs.')
+
+    # Timeout user
+    try:
+        await user.timeout(SOLAS_TIMEOUTS[time], reason=reason)
+    except discord.Forbidden:
+        return await interaction.response.send_message(f'Lacking permissions to timeout {user}!')
+
+    return await interaction.response.send_message(
+        f'Timed out {user} (`{user.id}`) for {time} with reason `{reason}`.')
 
 # Non commands
 
@@ -159,7 +203,7 @@ async def unban_users():
                 await client.solas.unban(
                     await client.fetch_user(user_id),
                     reason='6-month ban expired')
-            except NotFound:
+            except discord.NotFound:
                 logging.warning("User wasn't banned!")
             CURSOR.execute('DELETE FROM bans WHERE user = ?;', (user_id,))
             CONN.commit()
