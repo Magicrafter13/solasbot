@@ -85,7 +85,7 @@ async def send_dm(user: Member, message: str) -> bool:
 @app_commands.describe(user='Username to ban.', reason='Optional reason for banning.')
 async def ban(interaction: Interaction, user: Member, reason: Optional[str]='none given'):
     """Add user to ban database, and then bans them."""
-    if not try_authorization(interaction, user):
+    if not await try_authorization(interaction, user):
         return
 
     # DM banee
@@ -119,7 +119,7 @@ async def ban(interaction: Interaction, user: Member, reason: Optional[str]='non
 @app_commands.describe(user='Member to kick.', reason='Optional reason for kicking.')
 async def kick(interaction: Interaction, user: Member, reason: Optional[str]='none given'):
     """Kick user, and tell them why."""
-    if not try_authorization(interaction, user):
+    if not await try_authorization(interaction, user):
         return
 
     # DM banee
@@ -164,7 +164,7 @@ async def timeout(
     reason: Optional[str]='none given'
 ):
     """Timeout user, and tell them why."""
-    if not try_authorization(interaction, user):
+    if not await try_authorization(interaction, user):
         return
 
     # DM rascal
@@ -186,7 +186,7 @@ async def timeout(
 @tree.command(name='clear', description='Delete all the messages in the current channel.')
 async def clear(interaction: Interaction):
     """Delete every message in the channel, if it is in the whitelist."""
-    if not try_authorization(interaction):
+    if not await try_authorization(interaction):
         return
 
     if not interaction.channel_id in CHANNEL_CLEAR_WHITELIST:
