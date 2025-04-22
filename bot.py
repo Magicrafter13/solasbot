@@ -11,7 +11,12 @@ from typing import Optional
 import discord
 from discord import app_commands, Client, Guild, Intents, Interaction, Member
 
-from config import MAX_ALLOWED_BAN_ROLE_ID as ban_role_id, STAFF_ROLE_ID as role_id, TOKEN
+from config import (
+    CHANNEL_CLEAR_WHITELIST,
+    MAX_ALLOWED_BAN_ROLE_ID as ban_role_id,
+    STAFF_ROLE_ID as role_id,
+    TOKEN
+)
 
 logging.basicConfig(level=logging.INFO)
 sys.stdout.reconfigure(line_buffering=True)
@@ -177,6 +182,28 @@ async def timeout(
 
     return await interaction.response.send_message(
         f'Timed out {user} (`{user.id}`) for {time} with reason `{reason}`.')
+
+@tree.command(name='clear', description='Delete all the messages in the current channel.')
+async def clear(interaction: Interaction):
+    """Delete every message in the channel, if it is in the whitelist."""
+    if not try_authorization(interaction):
+        return
+
+    if not interaction.channel_id in CHANNEL_CLEAR_WHITELIST:
+        return await interaction.response.send_message(
+            'You are not allowed to clear this channel!',
+            ephemeral=True)
+
+    await interaction.response.send_message('Clearing messages, please be patient.', ephemeral=True)
+
+    try:
+        async for message in interaction.channel.history(limit=None, oldest_first=True):
+            message.delete()
+    except discord.Forbidden:
+        return await interaction.followup.send('Unable to delete message(s).', ephemeral=True)
+    except discord.HTTPException:
+        return await interaction.followup.send('Unable to delete message(s).', ephemeral=True)
+    return await interaction.followup.send('Done!', ephemeral=True)
 
 # Non commands
 
