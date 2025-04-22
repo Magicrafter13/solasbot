@@ -198,7 +198,7 @@ async def clear(interaction: Interaction):
 
     try:
         async for message in interaction.channel.history(limit=None, oldest_first=True):
-            message.delete()
+            await message.delete()
     except discord.Forbidden:
         return await interaction.followup.send('Unable to delete message(s).', ephemeral=True)
     except discord.HTTPException:
