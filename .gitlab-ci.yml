@@ -30,3 +30,22 @@ docker-build:
     - when: never
   tags:
     - docker
+
+deploy-solasbot:
+  stage: deploy
+  environment:
+    name: production
+  before_script:
+    - chmod 600 "$SSH_PRIVATE_KEY"
+    - mkdir -p ~/.ssh
+    - ssh-keyscan $SSH_HOST >> ~/.ssh/known_hosts
+  script:
+    - ssh -i "$SSH_PRIVATE_KEY" "$SSH_USER@$SSH_HOST" "deploy $CI_COMMIT_TAG"
+  rules:
+    # Major (breaking) update
+    - if: '$CI_COMMIT_TAG =~ /^v\d+\.0$/'
+      when: manual
+    # Minor update
+    - if: '$CI_COMMIT_TAG =~ /^v\d+\.\d+$/'
+      when: always
+    - when: never
