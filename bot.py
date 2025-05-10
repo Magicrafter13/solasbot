@@ -67,7 +67,7 @@ async def try_authorization(interaction: Interaction, user: Optional[Member]=Non
         guild_roles = [role.id for role in interaction.guild.roles]
         if guild_roles.index(user.roles[-1].id) > guild_roles.index(ban_role_id):
             await interaction.response.send_message(
-                f'You are not allowed to run `/{interaction.command.name}` on this user due to their roles.',
+                f'You are not allowed to run `/{interaction.command.name}` on this user due to their roles.',  # pylint: disable=line-too-long
                 ephemeral=True)
             return False
     return True
@@ -131,7 +131,8 @@ async def ban(interaction: Interaction, user: Member, reason: Optional[str]='non
     except discord.Forbidden:
         return await interaction.response.send_message(f'Lacking permissions to ban {user}!')
 
-    await log_action('ban (6 month)', interaction.user, f'user banned: <@{user.id}>\nreason:\n> {reason}')
+    await log_action(
+        'ban (6 month)', interaction.user, f'user banned: <@{user.id}>\nreason:\n> {reason}')
     return await interaction.response.send_message(
         f'Banned {user} (`{user.id}`) with reason `{reason}`.')
 
@@ -203,7 +204,10 @@ async def timeout(
     except discord.Forbidden:
         return await interaction.response.send_message(f'Lacking permissions to timeout {user}!')
 
-    await log_action('timeout', interaction.user, f'user timed out: <@{user.id}>\nlength of time: {time}\nreason:\n> {reason}')
+    await log_action(
+        'timeout',
+        interaction.user,
+        f'user timed out: <@{user.id}>\nlength of time: {time}\nreason:\n> {reason}')
     return await interaction.response.send_message(
         f'Timed out {user} (`{user.id}`) for {time} with reason `{reason}`.')
 
@@ -230,8 +234,36 @@ async def clear(interaction: Interaction):
     except discord.HTTPException:
         return await interaction.followup.send('Unable to delete message(s).', ephemeral=True)
 
-    await log_action('channel clear', interaction.user, f'channel: https://discord.com/channels/{PRIMARY_GUILD}/{interaction.channel_id}')
+    await log_action(
+        'channel clear',
+        interaction.user,
+        f'channel: https://discord.com/channels/{PRIMARY_GUILD}/{interaction.channel_id}')
     return await interaction.followup.send('Done!', ephemeral=True)
+
+@tree.command(name='spam', description='Permanently ban bots, scammers, spammers, etc.')
+@app_commands.describe(
+    user='User to receive the ban hammer.',
+    reason='Optional additional context for ban.')
+async def spam(interaction: Interaction, user: Member, reason: Optional[str]=''):
+    """Permanently ban user, bypassing the database, and without a DM."""
+    if await try_authorization(interaction, user) is False:
+        return
+
+    full_reason = f'Spam account. {reason}'
+
+    if DRY_RUN:
+        return
+    try:
+        await interaction.guild.ban(user, reason=full_reason)
+    except discord.Forbidden:
+        return await interaction.response.send_message(f'Lacking permissions to ban {user}!')
+
+    await log_action(
+        'permanent ban (spam)',
+        interaction.user,
+        f'user banned: <@{user.id}>\nreason:\n> {full_reason}')
+    return await interaction.response.send_message(
+        f'Banned {user} (`{user.id}`) with reason `{full_reason}`.')
 
 # Non commands
 
