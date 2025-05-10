@@ -131,10 +131,14 @@ async def ban(interaction: Interaction, user: Member, reason: Optional[str]='non
     except discord.Forbidden:
         return await interaction.response.send_message(f'Lacking permissions to ban {user}!')
 
+    user_info = f'<@{user.id}> (`{user.id}`)'
+
     await log_action(
-        'ban (6 month)', interaction.user, f'user banned: <@{user.id}>\nreason:\n> {reason}')
+        'ban (6 month)',
+        interaction.user,
+        f'user banned: {user_info}\nreason:\n> {reason}')
     return await interaction.response.send_message(
-        f'Banned {user} (`{user.id}`) with reason `{reason}`.')
+        f'Banned {user_info} with reason `{reason}`.')
 
 @tree.command(name='kick', description='Kick someone from the server.')
 @app_commands.describe(user='Member to kick.', reason='Optional reason for kicking.')
@@ -158,9 +162,14 @@ async def kick(interaction: Interaction, user: Member, reason: Optional[str]='no
     except discord.Forbidden:
         return await interaction.response.send_message(f'Lacking permissions to kick {user}!')
 
-    await log_action('kick', interaction.user, f'user kicked: <@{user.id}>\nreason:\n> {reason}')
+    user_info = f'<@{user.id}> (`{user.id}`)'
+
+    await log_action(
+        'kick',
+        interaction.user,
+        f'user kicked: {user_info}\nreason:\n> {reason}')
     return await interaction.response.send_message(
-        f'Kicked {user} (`{user.id}`) with reason `{reason}`.')
+        f'Kicked {user_info} with reason `{reason}`.')
 
 SOLAS_TIMEOUTS = {
     '1h': timedelta(hours=1),
@@ -204,12 +213,14 @@ async def timeout(
     except discord.Forbidden:
         return await interaction.response.send_message(f'Lacking permissions to timeout {user}!')
 
+    user_info = f'<@{user.id}> (`{user.id}`)'
+
     await log_action(
         'timeout',
         interaction.user,
-        f'user timed out: <@{user.id}>\nlength of time: {time}\nreason:\n> {reason}')
+        f'user timed out: {user_info}\nlength of time: {time}\nreason:\n> {reason}')
     return await interaction.response.send_message(
-        f'Timed out {user} (`{user.id}`) for {time} with reason `{reason}`.')
+        f'Timed out {user_info} for {time} with reason `{reason}`.')
 
 @tree.command(name='clear', description='Delete all the messages in the current channel.')
 async def clear(interaction: Interaction):
@@ -258,12 +269,14 @@ async def spam(interaction: Interaction, user: Member, reason: Optional[str]='')
     except discord.Forbidden:
         return await interaction.response.send_message(f'Lacking permissions to ban {user}!')
 
+    user_info = f'<@{user.id}> (`{user.id}`)'
+
     await log_action(
         'permanent ban (spam)',
         interaction.user,
-        f'user banned: <@{user.id}>\nreason:\n> {full_reason}')
+        f'user banned: {user_info}\nreason:\n> {full_reason}')
     return await interaction.response.send_message(
-        f'Banned {user} (`{user.id}`) with reason `{full_reason}`.')
+        f'Banned {user_info} with reason `{full_reason}`.')
 
 # Non commands
 
