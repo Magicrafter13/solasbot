@@ -137,7 +137,7 @@ async def ban(interaction: Interaction, user: User, reason: Optional[str]='none 
     if DRY_RUN:
         return
     try:
-        await interaction.guild.ban(user, reason=reason)
+        await interaction.guild.ban(user, reason=reason, delete_message_seconds=0)
     except discord.Forbidden:
         return await interaction.response.send_message(f'Lacking permissions to ban {user}!')
 
@@ -157,7 +157,7 @@ async def kick(interaction: Interaction, user: Member, reason: Optional[str]='no
     if await try_authorization(interaction, user) is False:
         return
 
-    # DM banee
+    # DM kickee
     if not await send_dm(
         user,
         f'You have been kicked from The Solas Council.\nGiven reason:\n> {reason}'
@@ -261,7 +261,7 @@ async def clear(interaction: Interaction):
         f'channel: https://discord.com/channels/{PRIMARY_GUILD}/{interaction.channel_id}')
     return await interaction.followup.send('Done!', ephemeral=True)
 
-@tree.command(name='spam', description='Permanently ban bots, scammers, spammers, etc.')
+@tree.command(name='spam', description='Permanently ban bots, scammers, spammers, etc. Deletes the last 24 hours of messages sent by them.')
 @app_commands.describe(
     user='User to receive the ban hammer.',
     reason='Optional additional context for ban.')
