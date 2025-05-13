@@ -168,7 +168,7 @@ async def kick(interaction: Interaction, user: Member, reason: Optional[str]='no
     if DRY_RUN:
         return
     try:
-        interaction.guild.kick(user, reason=reason)
+        await interaction.guild.kick(user, reason=reason)
     except discord.Forbidden:
         return await interaction.response.send_message(f'Lacking permissions to kick {user}!')
 
