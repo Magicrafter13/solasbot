@@ -10,7 +10,7 @@ from os import environ
 from typing import Optional
 
 import discord
-from discord import app_commands, Client, Guild, Intents, Interaction, Member
+from discord import app_commands, Client, Guild, Intents, Interaction, Member, User
 
 from config import (
     CHANNEL_CLEAR_WHITELIST,
@@ -53,8 +53,18 @@ CURSOR.execute('''
 
 # Helper functions
 
-async def try_authorization(interaction: Interaction, user: Optional[Member]=None) -> bool:
+async def try_authorization(interaction: Interaction, user: Optional[Member | User]=None) -> bool:
     """Check if user is authorized to run command, inform them if they aren't."""
+    # If argument is a User type, see if it can be resolved to a Member type. If not, return true.
+    if (isinstance(user, User)):
+        try:
+            member = await interaction.guild.fetch_member(user.id)
+            user = member
+        except discord.NotFound:
+            return True
+
+    # user is now type Member
+
     # Check that they are an administrator/moderator
     if not role_id in [role.id for role in interaction.user.roles]:
         await interaction.response.send_message(
@@ -72,7 +82,7 @@ async def try_authorization(interaction: Interaction, user: Optional[Member]=Non
             return False
     return True
 
-async def send_dm(user: Member, message: str) -> bool:
+async def send_dm(user: User, message: str) -> bool:
     """Send a DM to a user (creating the channel if necessary)."""
     dm = user.dm_channel
     try:
@@ -100,7 +110,7 @@ async def log_action(action: str, user: Member, info: Optional[str]=''):
 
 @tree.command(name='ban', description='6 month ban')
 @app_commands.describe(user='Username to ban.', reason='Optional reason for banning.')
-async def ban(interaction: Interaction, user: Member, reason: Optional[str]='none given'):
+async def ban(interaction: Interaction, user: User, reason: Optional[str]='none given'):
     """Add user to ban database, and then bans them."""
     if await try_authorization(interaction, user) is False:
         return
@@ -255,7 +265,7 @@ async def clear(interaction: Interaction):
 @app_commands.describe(
     user='User to receive the ban hammer.',
     reason='Optional additional context for ban.')
-async def spam(interaction: Interaction, user: Member, reason: Optional[str]=''):
+async def spam(interaction: Interaction, user: User, reason: Optional[str]=''):
     """Permanently ban user, bypassing the database, and without a DM."""
     if await try_authorization(interaction, user) is False:
         return
@@ -303,6 +313,11 @@ async def unban_users():
                 await client.primary_guild.unban(
                     await client.fetch_user(user_id),
                     reason='6-month ban expired')
+                user_info = f'<@{user_id}> (`{user_id}`)'
+                await log_action(
+                    'unban',
+                    client.user,
+                    f'user unbanned: {user_info}\nreason:\n> 6-month ban has expired')
             except discord.NotFound:
                 logging.warning("User wasn't banned!")
             CURSOR.execute('DELETE FROM bans WHERE user = ?;', (user_id,))
