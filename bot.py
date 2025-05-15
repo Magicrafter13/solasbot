@@ -109,42 +109,66 @@ async def log_action(action: str, user: Member, info: Optional[str]=''):
 # Bot commands
 
 @tree.command(name='ban', description='6 month ban')
-@app_commands.describe(user='Username to ban.', reason='Optional reason for banning.')
-async def ban(interaction: Interaction, user: User, reason: Optional[str]='none given'):
+@app_commands.describe(user='Username to ban.', type='Type of ban to issue.', reason='Optional, additional, reason for banning (will be sent to the banned user).')
+@app_commands.choices(type=[
+    app_commands.Choice(name='6-month ban (class 1 infraction).', value='ban'),
+    app_commands.Choice(name="Bot/Spam/Scam account perma-ban (doesn't DM reason, deletes 7-days of their messages).", value='spam'),
+    app_commands.Choice(name='Permanently ban a regular user (blacklist).', value='blacklist')
+])
+async def ban(interaction: Interaction, user: User, type: str, reason: Optional[str]='none given'):
     """Add user to ban database, and then bans them."""
     if await try_authorization(interaction, user) is False:
         return
 
+    dm_message = ''
+    match type:
+        case 'ban':
+            dm_message = (
+                'You have receive a 6-month ban from The Solas Council.\n'
+                'Given reason:\n'
+                f'> {reason}'
+            )
+        case 'blacklist':
+            dm_message = (
+                'You have been permanently blacklisted from The Solas Council.\n'
+                'Given reason:\n'
+                f'> {reason}'
+            )
+
     # DM banee
-    if not await send_dm(
-        user,
-        f'You have receive a 6-month ban from The Solas Council.\nGiven reason:\n> {reason}'
-    ):
+    if dm_message != '' and not await send_dm(user, dm_message):
         await interaction.channel.send(f'Failed to DM {user}, check logs.')
 
-    # Add to database
-    CURSOR.execute(
-        '''
-            INSERT INTO bans
-            VALUES (?, date('now'))
-            ON CONFLICT (user) DO
-                UPDATE SET date = date('now');
-        ''',
-        (user.id,))
-    CONN.commit()
+    if type == 'ban':
+        # Add to database
+        CURSOR.execute(
+            '''
+                INSERT INTO bans
+                VALUES (?, date('now'))
+                ON CONFLICT (user) DO
+                    UPDATE SET date = date('now');
+            ''',
+            (user.id,))
+        CONN.commit()
 
     # Ban user
     if DRY_RUN:
         return
     try:
-        await interaction.guild.ban(user, reason=reason, delete_message_seconds=0)
+        await interaction.guild.ban(user, reason=reason, delete_message_seconds=(604800 if type == 'spam' else 0))
     except discord.Forbidden:
         return await interaction.response.send_message(f'Lacking permissions to ban {user}!')
 
     user_info = f'<@{user.id}> (`{user.id}`)'
 
+    action = 'ban'
+    match type:
+        case 'ban':
+            action = '6-month ban'
+        case 'blacklist':
+            action = 'blacklist'
     await log_action(
-        'ban (6 month)',
+        action,
         interaction.user,
         f'user banned: {user_info}\nreason:\n> {reason}')
     return await interaction.response.send_message(
@@ -260,33 +284,6 @@ async def clear(interaction: Interaction):
         interaction.user,
         f'channel: https://discord.com/channels/{PRIMARY_GUILD}/{interaction.channel_id}')
     return await interaction.followup.send('Done!', ephemeral=True)
-
-@tree.command(name='spam', description='Permanently ban bots, scammers, spammers, etc. Deletes the last 24 hours of messages sent by them.')
-@app_commands.describe(
-    user='User to receive the ban hammer.',
-    reason='Optional additional context for ban.')
-async def spam(interaction: Interaction, user: User, reason: Optional[str]=''):
-    """Permanently ban user, bypassing the database, and without a DM."""
-    if await try_authorization(interaction, user) is False:
-        return
-
-    full_reason = f'Spam account. {reason}'
-
-    if DRY_RUN:
-        return
-    try:
-        await interaction.guild.ban(user, reason=full_reason)
-    except discord.Forbidden:
-        return await interaction.response.send_message(f'Lacking permissions to ban {user}!')
-
-    user_info = f'<@{user.id}> (`{user.id}`)'
-
-    await log_action(
-        'permanent ban (spam)',
-        interaction.user,
-        f'user banned: {user_info}\nreason:\n> {full_reason}')
-    return await interaction.response.send_message(
-        f'Banned {user_info} with reason `{full_reason}`.')
 
 # Non commands
 
