@@ -66,7 +66,7 @@ async def try_authorization(interaction: Interaction, user: Optional[Member | Us
     # If argument is a User type, see if it can be resolved to a Member type. If not, return true.
     if (isinstance(user, User)):
         try:
-            member = await interaction.guild.fetch_member(user.id)
+            member = await client.primary_guild.fetch_member(user.id)
             user = member
         except discord.NotFound:
             return True
@@ -82,7 +82,7 @@ async def try_authorization(interaction: Interaction, user: Optional[Member | Us
     # If the interaction involves another user, make sure that they are within the bot's
     # jurisdiction
     if user:
-        guild_roles = [role.id for role in interaction.guild.roles]
+        guild_roles = [role.id for role in client.primary_guild.roles]
         if guild_roles.index(user.roles[-1].id) > guild_roles.index(ban_role_id):
             await interaction.response.send_message(
                 f'You are not allowed to run `/{interaction.command.name}` on this user due to their roles.',  # pylint: disable=line-too-long
@@ -186,7 +186,7 @@ async def ban(interaction: Interaction, user: User, type: str, reason: Optional[
     if DRY_RUN:
         return
     try:
-        await interaction.guild.ban(
+        await client.primary_guild.ban(
             user,
             reason=reason,
             delete_message_seconds=(604800 if type == 'spam' else 0))
@@ -229,7 +229,7 @@ async def kick(interaction: Interaction, user: Member, reason: Optional[str]='no
     if DRY_RUN:
         return
     try:
-        await interaction.guild.kick(user, reason=reason)
+        await client.primary_guild.kick(user, reason=reason)
     except discord.Forbidden:
         return await interaction.response.send_message(f'Lacking permissions to kick {user}!')
     except Exception as _e:
@@ -342,7 +342,7 @@ async def unban(interaction: Interaction, user: User, reason: Optional[str]):
 
     # Unban user
     try:
-        await interaction.guild.unban(user, reason=reason)
+        await client.primary_guild.unban(user, reason=reason)
     except discord.Forbidden:
         return await interaction.response.send_message(f'Lacking permissions to unban {user}!')
     except Exception as _e:
