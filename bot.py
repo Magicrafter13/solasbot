@@ -100,6 +100,16 @@ async def send_dm(user: User, message: str) -> bool:
         return False
     return True
 
+def remove_from_db(user: User):
+    CURSOR.execute(
+        '''
+            DELETE FROM bans
+            WHERE user = ?;
+        ''',
+        (user.id,)
+    )
+    CONN.commit()
+
 async def log_action(action: str, user: Member, info: Optional[str]=''):
     """Log a bot action, with optional additional information."""
     if info != '':
@@ -139,8 +149,8 @@ async def ban(interaction: Interaction, user: User, type: str, reason: Optional[
     if dm_message != '' and not await send_dm(user, dm_message):
         await interaction.channel.send(f'Failed to DM {user}, check logs.')
 
+    # Add to database
     if type == 'ban':
-        # Add to database
         CURSOR.execute(
             '''
                 INSERT INTO bans
@@ -150,12 +160,18 @@ async def ban(interaction: Interaction, user: User, type: str, reason: Optional[
             ''',
             (user.id,))
         CONN.commit()
+    # Remove from database if permanent ban and already there
+    else:
+        remove_from_db(user)
 
     # Ban user
     if DRY_RUN:
         return
     try:
-        await interaction.guild.ban(user, reason=reason, delete_message_seconds=(604800 if type == 'spam' else 0))
+        await interaction.guild.ban(
+            user,
+            reason=reason,
+            delete_message_seconds=(604800 if type == 'spam' else 0))
     except discord.Forbidden:
         return await interaction.response.send_message(f'Lacking permissions to ban {user}!')
 
@@ -285,6 +301,33 @@ async def clear(interaction: Interaction):
         f'channel: https://discord.com/channels/{PRIMARY_GUILD}/{interaction.channel_id}')
     return await interaction.followup.send('Done!', ephemeral=True)
 
+@tree.command(name='unban', description="Manually lift a user's ban.")
+@app_commands.describe(
+    user='Member to unban.',
+    reason='Optional reason for unban (not sent to user).'
+)
+async def unban(interaction: Interaction, user: User, reason: Optional[str]):
+    """Unban a user."""
+    if await try_authorization(interaction, user) is False:
+        return
+
+    remove_from_db(user)
+
+    # Unban user
+    try:
+        await interaction.guild.unban(user, reason=reason)
+    except discord.Forbidden:
+        return await interaction.response.send_message(f'Lacking permissions to unban {user}!')
+
+    user_info = f'<@{user.id}> (`{user.id}`)'
+
+    await log_action(
+        'unban',
+        interaction.user,
+        f'user unbanned: {user_info}\nreason:\n> {reason}')
+    return await interaction.response.send_message(
+        f'Unbanned {user_info} with reason `{reason}`.')
+
 # Non commands
 
 async def unban_users():
@@ -317,8 +360,7 @@ async def unban_users():
                     f'user unbanned: {user_info}\nreason:\n> 6-month ban has expired')
             except discord.NotFound:
                 logging.warning("User wasn't banned!")
-            CURSOR.execute('DELETE FROM bans WHERE user = ?;', (user_id,))
-            CONN.commit()
+            remove_from_db(user)
 
 
 @client.event
