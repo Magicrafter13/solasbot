@@ -12,14 +12,7 @@ from typing import Optional
 import discord
 from discord import app_commands, Client, Guild, Intents, Interaction, Member, User
 
-from config import (
-    CHANNEL_CLEAR_WHITELIST,
-    LOGGING_SETTINGS,
-    MAX_ALLOWED_BAN_ROLE_ID as ban_role_id,
-    PRIMARY_GUILD,
-    STAFF_ROLE_ID as role_id,
-    TOKEN,
-)
+from config import TOKEN, PRIMARY_GUILD, LOGGING, EXTRA_GUILDS
 
 logging.basicConfig(level=logging.INFO)
 sys.stdout.reconfigure(line_buffering=True)
@@ -27,7 +20,6 @@ sys.stdout.reconfigure(line_buffering=True)
 # Config
 
 DRY_RUN = environ.get('DRY_RUN', 'False').lower() == 'true'
-LOGGING_GUILD, LOGGING_CHANNEL = LOGGING_SETTINGS
 
 # Discord Stuff
 
@@ -39,7 +31,6 @@ client = Client(intents=intents)
 tree = app_commands.CommandTree(client)
 
 client.primary_guild: Guild = None
-client.logging_guild: Guild = None
 
 COLORS = {
     'ban': 0xe01b24,
@@ -74,7 +65,7 @@ async def try_authorization(interaction: Interaction, user: Optional[Member | Us
     # user is now type Member
 
     # Check that they are an administrator/moderator
-    if not role_id in [role.id for role in interaction.user.roles]:
+    if not PRIMARY_GUILD['staff_role_id'] in [role.id for role in interaction.user.roles]:
         await interaction.response.send_message(
             'You are not authorized to use this command!',
             ephemeral=True)
@@ -83,7 +74,7 @@ async def try_authorization(interaction: Interaction, user: Optional[Member | Us
     # jurisdiction
     if user:
         guild_roles = [role.id for role in client.primary_guild.roles]
-        if guild_roles.index(user.roles[-1].id) > guild_roles.index(ban_role_id):
+        if guild_roles.index(user.roles[-1].id) > guild_roles.index(PRIMARY_GUILD['max_bannable_role_id']):  # pylint: disable=line-too-long
             await interaction.response.send_message(
                 f'You are not allowed to run `/{interaction.command.name}` on this user due to their roles.',  # pylint: disable=line-too-long
                 ephemeral=True)
@@ -132,7 +123,7 @@ async def log_action(action: str, user: Member, info: Optional[str]='', color: O
     embed.set_author(name=f'{user.display_name}', icon_url=user.avatar.url if user.avatar else None)
     embed.set_footer(text="Moderator Action Log Item")
 
-    await client.logging_channel.send(user.mention, embed=embed)
+    await client.logging_channels['mod_actions'].send(user.mention, embed=embed)
 
 # Bot commands
 
@@ -305,7 +296,7 @@ async def clear(interaction: Interaction):
     if await try_authorization(interaction) is False:
         return
 
-    if not interaction.channel_id in CHANNEL_CLEAR_WHITELIST:
+    if not interaction.channel_id in PRIMARY_GUILD['clear_channel_whitelist']:
         return await interaction.response.send_message(
             'You are not allowed to clear this channel!',
             ephemeral=True)
@@ -325,7 +316,7 @@ async def clear(interaction: Interaction):
     await log_action(
         'channel clear',
         interaction.user,
-        info=f'channel: https://discord.com/channels/{PRIMARY_GUILD}/{interaction.channel_id}')
+        info=f'channel: https://discord.com/channels/{PRIMARY_GUILD["id"]}/{interaction.channel_id}')
     return await interaction.followup.send('Done!', ephemeral=True)
 
 @tree.command(name='unban', description="Manually lift a user's ban.")
@@ -397,9 +388,10 @@ async def unban_users():
 async def on_ready():
     """Initialize bot data and tasks."""
     logging.info('Logged in as %s.', client.user)
-    client.primary_guild = await client.fetch_guild(PRIMARY_GUILD)
-    client.logging_guild = await client.fetch_guild(LOGGING_GUILD)
-    client.logging_channel = await client.logging_guild.fetch_channel(LOGGING_CHANNEL)
+    client.primary_guild = await client.fetch_guild(PRIMARY_GUILD["id"])
+    client.logging_channels = {
+        log_type: await (await client.fetch_guild(guild_id)).fetch_channel(channel_id)
+        for log_type, (guild_id, channel_id) in LOGGING.items()}
     client.loop.create_task(unban_users())
     await asyncio.sleep(5)
     await tree.sync()
