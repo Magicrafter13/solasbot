@@ -41,6 +41,14 @@ tree = app_commands.CommandTree(client)
 client.primary_guild: Guild = None
 client.logging_guild: Guild = None
 
+COLORS = {
+    'ban': 0xe01b24,
+    'kick': 0xff7800,
+    'timeout': 0xf6d32d,
+    'event': 0x986a44,
+    'unban': 0x33d17a,
+}
+
 # Connect to local database
 CONN = sqlite3.connect('users.db')
 CURSOR = CONN.cursor()
@@ -101,6 +109,7 @@ async def send_dm(user: User, message: str) -> bool:
     return True
 
 def remove_from_db(user: User):
+    """Remove a user.id from the SQLite database."""
     CURSOR.execute(
         '''
             DELETE FROM bans
@@ -110,11 +119,20 @@ def remove_from_db(user: User):
     )
     CONN.commit()
 
-async def log_action(action: str, user: Member, info: Optional[str]=''):
+async def log_action(action: str, user: Member, info: Optional[str]='', color: Optional[int]=COLORS['event']):
     """Log a bot action, with optional additional information."""
-    if info != '':
-        info = f'\n\n{info}'
-    await client.logging_channel.send(f'action: `{action}`\nstaff member: <@{user.id}>{info}')
+    #if info != '':
+    #    info = f'\n\n{info}'
+
+    embed = discord.Embed(
+        title=f'Action: `{action}`',
+        description=info,
+        colour=color,
+        timestamp=datetime.now())
+    embed.set_author(name=f'{user.display_name}', icon_url=user.avatar.url if user.avatar else None)
+    embed.set_footer(text="Moderator Action Log Item")
+
+    await client.logging_channel.send(user.mention, embed=embed)
 
 # Bot commands
 
@@ -174,8 +192,10 @@ async def ban(interaction: Interaction, user: User, type: str, reason: Optional[
             delete_message_seconds=(604800 if type == 'spam' else 0))
     except discord.Forbidden:
         return await interaction.response.send_message(f'Lacking permissions to ban {user}!')
+    except Exception as _e:
+        return print(f'EXCEPTION IN /ban:\n{_e}')
 
-    user_info = f'<@{user.id}> (`{user.id}`)'
+    user_info = f'{user.mention} (`{user.id}`)'
 
     action = 'ban'
     match type:
@@ -186,7 +206,8 @@ async def ban(interaction: Interaction, user: User, type: str, reason: Optional[
     await log_action(
         action,
         interaction.user,
-        f'user banned: {user_info}\nreason:\n> {reason}')
+        info=f'user banned: {user_info}\nreason:\n> {reason}',
+        color=COLORS['ban'])
     return await interaction.response.send_message(
         f'Banned {user_info} with reason `{reason}`.')
 
@@ -211,13 +232,16 @@ async def kick(interaction: Interaction, user: Member, reason: Optional[str]='no
         await interaction.guild.kick(user, reason=reason)
     except discord.Forbidden:
         return await interaction.response.send_message(f'Lacking permissions to kick {user}!')
+    except Exception as _e:
+        return print(f'EXCEPTION IN /kick:\n{_e}')
 
-    user_info = f'<@{user.id}> (`{user.id}`)'
+    user_info = f'{user.mention} (`{user.id}`)'
 
     await log_action(
         'kick',
         interaction.user,
-        f'user kicked: {user_info}\nreason:\n> {reason}')
+        info=f'user kicked: {user_info}\nreason:\n> {reason}',
+        color=COLORS['kick'])
     return await interaction.response.send_message(
         f'Kicked {user_info} with reason `{reason}`.')
 
@@ -262,13 +286,16 @@ async def timeout(
         await user.timeout(SOLAS_TIMEOUTS[time], reason=reason)
     except discord.Forbidden:
         return await interaction.response.send_message(f'Lacking permissions to timeout {user}!')
+    except Exception as _e:
+        return print(f'EXCEPTION IN /timeout:\n{_e}')
 
-    user_info = f'<@{user.id}> (`{user.id}`)'
+    user_info = f'{user.mention} (`{user.id}`)'
 
     await log_action(
         'timeout',
         interaction.user,
-        f'user timed out: {user_info}\nlength of time: {time}\nreason:\n> {reason}')
+        info=f'user timed out: {user_info}\nlength of time: {time}\nreason:\n> {reason}',
+        color=COLORS['timeout'])
     return await interaction.response.send_message(
         f'Timed out {user_info} for {time} with reason `{reason}`.')
 
@@ -298,7 +325,7 @@ async def clear(interaction: Interaction):
     await log_action(
         'channel clear',
         interaction.user,
-        f'channel: https://discord.com/channels/{PRIMARY_GUILD}/{interaction.channel_id}')
+        info=f'channel: https://discord.com/channels/{PRIMARY_GUILD}/{interaction.channel_id}')
     return await interaction.followup.send('Done!', ephemeral=True)
 
 @tree.command(name='unban', description="Manually lift a user's ban.")
@@ -318,13 +345,16 @@ async def unban(interaction: Interaction, user: User, reason: Optional[str]):
         await interaction.guild.unban(user, reason=reason)
     except discord.Forbidden:
         return await interaction.response.send_message(f'Lacking permissions to unban {user}!')
+    except Exception as _e:
+        return print(f'EXCEPTION IN /unban:\n{_e}')
 
-    user_info = f'<@{user.id}> (`{user.id}`)'
+    user_info = f'{user.mention} (`{user.id}`)'
 
     await log_action(
         'unban',
         interaction.user,
-        f'user unbanned: {user_info}\nreason:\n> {reason}')
+        info=f'user unbanned: {user_info}\nreason:\n> {reason}',
+        color=COLORS['unban'])
     return await interaction.response.send_message(
         f'Unbanned {user_info} with reason `{reason}`.')
 
