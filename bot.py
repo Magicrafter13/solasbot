@@ -275,6 +275,10 @@ async def timeout(
 
     # Timeout user
     try:
+        user = await client.primary_guild.fetch_member(user.id)
+    except NotFound:
+        return await interaction.response.send_message('User is not a member in The Solas Council!')
+    try:
         await user.timeout(SOLAS_TIMEOUTS[time], reason=reason)
     except discord.Forbidden:
         return await interaction.response.send_message(f'Lacking permissions to timeout {user}!')
