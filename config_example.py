@@ -1,5 +1,7 @@
 """Bot configuration."""
 
+SERVER_NAME = 'The Solas Counil'  # str - used for ban messages, replies, etc
+
 TOKEN = 'SLKFdjkjsfdLSKDF.fskjfSKFJflSJF_ksjfdlLs.sdfkjslkfjsLSKDkd.d.sKJSlsd_jAL'  # str - bot token
 
 PRIMARY_GUILD = {

@@ -1,5 +1,5 @@
 #!/usr/bin/python3
-"""Bot for various administrative duties in the Solas Council."""
+"""Bot for various administrative duties in The Solas Council."""
 
 import asyncio
 import logging
@@ -12,7 +12,7 @@ from typing import Optional
 import discord
 from discord import app_commands, Client, Guild, Intents, Interaction, Member, User
 
-from config import TOKEN, PRIMARY_GUILD, LOGGING, EXTRA_GUILDS
+from config import TOKEN, PRIMARY_GUILD, LOGGING, EXTRA_GUILDS, SERVER_NAME
 
 logging.basicConfig(level=logging.INFO)
 sys.stdout.reconfigure(line_buffering=True)
@@ -144,13 +144,13 @@ async def ban(interaction: Interaction, user: User, type: str, reason: Optional[
     match type:
         case 'ban':
             dm_message = (
-                'You have receive a 6-month ban from The Solas Council.\n'
+                f'You have receive a 6-month ban from {SERVER_NAME}.\n'
                 'Given reason:\n'
                 f'> {reason}'
             )
         case 'blacklist':
             dm_message = (
-                'You have been permanently blacklisted from The Solas Council.\n'
+                f'You have been permanently blacklisted from {SERVER_NAME}.\n'
                 'Given reason:\n'
                 f'> {reason}'
             )
@@ -213,7 +213,7 @@ async def kick(interaction: Interaction, user: Member|User, reason: Optional[str
     # DM kickee
     if not await send_dm(
         user,
-        f'You have been kicked from The Solas Council.\nGiven reason:\n> {reason}'
+        f'You have been kicked from {SERVER_NAME}.\nGiven reason:\n> {reason}'
     ):
         await interaction.channel.send(f'Failed to DM {user}, check logs.')
 
@@ -269,7 +269,7 @@ async def timeout(
     # DM rascal
     if not await send_dm(
         user,
-        f'You have been timed out in The Solas Council.\nGiven reason:\n> {reason}'
+        f'You have been timed out in {SERVER_NAME}.\nGiven reason:\n> {reason}'
     ):
         await interaction.channel.send(f'Failed to DM {user}, check logs.')
 
@@ -277,7 +277,7 @@ async def timeout(
     try:
         user = await client.primary_guild.fetch_member(user.id)
     except NotFound:
-        return await interaction.response.send_message('User is not a member in The Solas Council!')
+        return await interaction.response.send_message(f'User is not a member in {SERVER_NAME}!')
     try:
         await user.timeout(SOLAS_TIMEOUTS[time], reason=reason)
     except discord.Forbidden:
