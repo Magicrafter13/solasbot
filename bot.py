@@ -3,11 +3,11 @@
 
 import asyncio
 import logging
+import math
 import os
 import sqlite3
 import sys
 from datetime import datetime, timedelta
-from os import environ
 from typing import Optional
 
 import discord
