@@ -68,7 +68,8 @@ async def try_authorization(interaction: Interaction, user: Optional[Member | Us
     # user is now type Member
 
     # Check that they are an administrator/moderator
-    if not PRIMARY_GUILD['staff_role_id'] in [role.id for role in interaction.user.roles]:
+    runner = await client.primary_guild.fetch_member(interaction.user.id)
+    if not PRIMARY_GUILD['staff_role_id'] in [role.id for role in runner.roles]:
         await interaction.response.send_message(
             'You are not authorized to use this command!',
             ephemeral=True)
