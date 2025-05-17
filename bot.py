@@ -416,11 +416,10 @@ async def on_member_join(member: Member):
         description=f'{member.mention}\n{member.id}: `{member.name}`',
         colour=COLORS['member_join'],
         timestamp=datetime.now())
-    embed.add_field(name='Joined Server', value=member.joined_at, inline=True)
-    embed.add_field(name='Joined Discord', value=member.created_at, inline=True)
+    embed.add_field(name='Joined Server', value=f'<t:{math.floor(member.joined_at.timestamp())}:D>', inline=True)
+    embed.add_field(name='Joined Discord', value=f'<t:{math.floor(member.created_at.timestamp())}:D>', inline=True)
     if member.avatar:
         embed.set_image(url=member.avatar.url)
-    #embed.set_author(name=)
     embed.set_footer(text="Member Event Log Item")
 
     await client.logging_channels['member_join'].send(embed=embed)
