@@ -20,7 +20,7 @@ sys.stdout.reconfigure(line_buffering=True)
 
 # Config
 
-DRY_RUN = environ.get('DRY_RUN', 'False').lower() == 'true'
+DRY_RUN = os.environ.get('DRY_RUN', 'False').lower() == 'true'
 
 # Discord Stuff
 
