@@ -58,7 +58,7 @@ CURSOR.execute('''
 async def try_authorization(interaction: Interaction, user: Optional[Member | User]=None) -> bool:
     """Check if user is authorized to run command, inform them if they aren't."""
     # If argument is a User type, see if it can be resolved to a Member type. If not, return true.
-    if (isinstance(user, User)):
+    if (isinstance(user, User) or interaction.guild.id != PRIMARY_GUILD['id']):
         try:
             member = await client.primary_guild.fetch_member(user.id)
             user = member
