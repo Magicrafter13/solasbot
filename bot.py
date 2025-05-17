@@ -3,6 +3,7 @@
 
 import asyncio
 import logging
+import os
 import sqlite3
 import sys
 from datetime import datetime, timedelta
@@ -400,6 +401,9 @@ async def on_ready():
         for log_type, (guild_id, channel_id) in LOGGING.items()}
     client.loop.create_task(unban_users())
     await asyncio.sleep(5)
+    await client.change_presence(activity=discord.Activity(
+        type=discord.ActivityType.watching,
+        name=f"{SERVER_NAME} ({os.environ.get('VERSION', 'unspecified bot version')})"))
     await tree.sync()
 
 @client.event
