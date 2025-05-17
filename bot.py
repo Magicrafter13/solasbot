@@ -204,7 +204,7 @@ async def ban(interaction: Interaction, user: User, type: str, reason: Optional[
 
 @tree.command(name='kick', description='Kick someone from the server.')
 @app_commands.describe(user='Member to kick.', reason='Optional reason for kicking.')
-async def kick(interaction: Interaction, user: Member, reason: Optional[str]='none given'):
+async def kick(interaction: Interaction, user: Member|User, reason: Optional[str]='none given'):
     """Kick user, and tell them why."""
     if await try_authorization(interaction, user) is False:
         return
@@ -257,7 +257,7 @@ SOLAS_TIMEOUTS = {
 ])
 async def timeout(
     interaction: Interaction,
-    user: Member,
+    user: Member|User,
     time: str,
     reason: Optional[str]='none given'
 ):
@@ -400,6 +400,8 @@ async def on_ready():
 @client.event
 async def on_member_join(member: Member):
     """Log a member joining the guild."""
+    # TODO: ignore if member is joining a non primary guild
+
     embed = discord.Embed(
         title='Member Join',
         description=f'{member.mention}\n{member.id}: `{member.name}`',
