@@ -38,6 +38,9 @@ COLORS = {
     'timeout': 0xf6d32d,
     'event': 0x986a44,
     'unban': 0x33d17a,
+
+    'member_join': 0x26a269,
+    'member_leave': 0xa51d2d,
 }
 
 # Connect to local database
@@ -112,9 +115,6 @@ def remove_from_db(user: User):
 
 async def log_action(action: str, user: Member, info: Optional[str]='', color: Optional[int]=COLORS['event']):
     """Log a bot action, with optional additional information."""
-    #if info != '':
-    #    info = f'\n\n{info}'
-
     embed = discord.Embed(
         title=f'Action: `{action}`',
         description=info,
@@ -383,6 +383,7 @@ async def unban_users():
                 logging.warning("User wasn't banned!")
             remove_from_db(user)
 
+# Events
 
 @client.event
 async def on_ready():
@@ -395,5 +396,22 @@ async def on_ready():
     client.loop.create_task(unban_users())
     await asyncio.sleep(5)
     await tree.sync()
+
+@client.event
+async def on_member_join(member: Member):
+    """Log a member joining the guild."""
+    embed = discord.Embed(
+        title='Member Join',
+        description=f'{member.mention}\n{member.id}: `{member.name}`',
+        colour=COLORS['member_join'],
+        timestamp=datetime.now())
+    embed.add_field(name='Joined Server', value=member.joined_at, inline=True)
+    embed.add_field(name='Joined Discord', value=member.created_at, inline=True)
+    if member.avatar:
+        embed.set_image(url=member.avatar.url)
+    #embed.set_author(name=)
+    embed.set_footer(text="Member Event Log Item")
+
+    await client.logging_channels['member_join'].send(embed=embed)
 
 client.run(TOKEN)
