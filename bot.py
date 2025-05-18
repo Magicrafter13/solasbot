@@ -52,6 +52,10 @@ CURSOR.execute('''
     CREATE TABLE IF NOT EXISTS bans (
         user INT NOT NULL PRIMARY KEY,
         date TIMESTAMP
+    );
+    CREATE TABLE IF NOT EXISTS timeouts (
+        user INT NOT NULL PRIMARY KEY,
+        date TIMESTAMP
     );''')
 
 # Helper functions
@@ -272,7 +276,18 @@ async def timeout(
         user,
         f'You have been timed out in {SERVER_NAME}.\nGiven reason:\n> {reason}'
     ):
-        await interaction.channel.send(f'Failed to DM {user}, check logs.')
+
+    # Add to database
+    await interaction.channel.send(f'Failed to DM {user}, check logs.')
+    CURSOR.execute(
+        '''
+            INSERT INTO timeouts
+            VALUES (?, ?)
+            ON CONFLICT (user) DO
+                UPDATE SET date = date('now');
+        ''',
+        (user.id,))
+    CONN.commit()
 
     # Timeout user
     try:
