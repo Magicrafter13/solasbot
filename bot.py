@@ -25,7 +25,8 @@ DRY_RUN = os.environ.get('DRY_RUN', 'False').lower() == 'true'
 # Discord Stuff
 
 intents = Intents.default()
-#intents.message_content = True
+intents.message_content = True
+intents.messages = True   
 intents.members = True
 #intents.reactions = True
 client = Client(intents=intents)
@@ -424,4 +425,87 @@ async def on_member_join(member: Member):
 
     await client.logging_channels['member_join'].send(embed=embed)
 
+@client.event
+async def on_member_remove(member: discord.Member):
+    """Log a member leaving the guild."""
+    # TODO: ignore if member is leaving a non-primary guild
+
+    embed = discord.Embed(
+        title='Member Leave',
+        description=f'{member.mention}\n{member.id}: `{member.name}`',
+        colour=COLORS['member_leave'],  
+        timestamp=datetime.now()
+    )
+
+    embed.add_field(name='Joined Server', value=f'<t:{math.floor(member.joined_at.timestamp())}:D>', inline=True)
+    embed.add_field(name='Joined Discord', value=f'<t:{math.floor(member.created_at.timestamp())}:D>', inline=True)
+
+    # Prepare a list of role mentions (excluding @everyone, which is default role)
+    roles = [role.mention for role in member.roles if role != member.guild.default_role]
+
+    if roles:
+        # Discord field values must be ≤ 1024 characters
+        roles_str = ', '.join(roles)
+        if len(roles_str) > 1024:
+            roles_str = roles_str[:1021] + '...'
+        embed.add_field(name='Roles', value=roles_str, inline=False)
+    else:
+        embed.add_field(name='Roles', value='No roles', inline=False)
+
+    if member.avatar:
+        embed.set_image(url=member.avatar.url)
+
+    embed.set_footer(text="Member Event Log Item")
+
+    await client.logging_channels['member_leave'].send(embed=embed)
+
+
+@client.event
+async def on_message_edit(before: discord.Message, after: discord.Message):
+    if before.author.bot or before.content == after.content:
+        return
+
+    embed = discord.Embed(
+        title="Message Edited",
+        color=discord.Color.orange(),
+        timestamp=datetime.now()  # or datetime.utcnow()
+    )
+
+    embed.description = (
+        f"**Author:** {before.author.mention} (`{before.author}`)\n"
+        f"**Channel:** {before.channel.mention} (`#{before.channel}`)"
+    )
+
+    embed.add_field(name="Before", value=before.content or "*[no content]*", inline=False)
+    embed.add_field(name="After", value=after.content or "*[no content]*", inline=False)
+    
+    embed.set_footer(
+        text=f"Message ID: {before.id} | Jump: {after.jump_url}"
+    )
+
+    await client.logging_channels['message_edit'].send(embed=embed)
+    
+@client.event
+async def on_message_delete(message: discord.Message):
+    if message.author.bot:
+        return
+
+    embed = discord.Embed(
+        title="Message Deleted",
+        color=discord.Color.red(),
+        timestamp=datetime.now()  
+    )
+
+    embed.description = (
+        f"**Author:** {message.author.mention} (`{message.author}`)\n"
+        f"**Channel:** {message.channel.mention} (`#{message.channel}`)"
+    )
+
+    embed.add_field(name="Content", value=message.content or "*[no content]*", inline=False)
+    embed.set_footer(text=f"Message ID: {message.id}")
+    
+    await client.logging_channels['message_edit'].send(embed=embed)
+
+
+    
 client.run(TOKEN)
