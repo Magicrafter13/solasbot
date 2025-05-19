@@ -407,6 +407,22 @@ async def unban_users():
                 logging.warning("User wasn't banned!")
             remove_from_db(user)
 
+async def untimeout_users():
+    """Wait until midnight, then clean out old timeout entries."""
+    while True:
+        now = datetime.now()
+        target = now.replace(hour=0, minute=0, second=0, microsecond=0)
+        if now >= target:
+            target += timedelta(days=1)
+        sleep_seconds = (target - now).total_seconds()
+        logging.info('Waiting %s seconds before checking bans...', sleep_seconds)
+        await asyncio.sleep(sleep_seconds)
+        logging.info('Removing stale timeouts')
+        CURSOR.execute('''
+            DELETE FROM timeouts
+            WHERE date < datetime('now');
+        ''')
+
 # Events
 
 @client.event
@@ -418,6 +434,7 @@ async def on_ready():
         log_type: await (await client.fetch_guild(guild_id)).fetch_channel(channel_id)
         for log_type, (guild_id, channel_id) in LOGGING.items()}
     client.loop.create_task(unban_users())
+    client.loop.create_task(untimeout_users())
     await asyncio.sleep(5)
     await client.change_presence(activity=discord.Activity(
         type=discord.ActivityType.watching,
