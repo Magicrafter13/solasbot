@@ -440,8 +440,13 @@ async def on_member_remove(member: Member):
     embed.add_field(name='Joined Server', value=f'<t:{math.floor(member.joined_at.timestamp())}:D>', inline=True)
     embed.add_field(name='Joined Discord', value=f'<t:{math.floor(member.created_at.timestamp())}:D>', inline=True)
 
-    # Prepare a list of role mentions (excluding @everyone, which is default role)
-    roles = [role.mention for role in member.roles if role != member.guild.default_role]
+    # Prepare a list of roles (excluding @everyone, which is default role)
+    roles = []
+    # Use role mentions if logging in the same server, otherwise resort to display names
+    if client.logging_channels['member_leave'].id == client.primary_guild.id:
+        roles = [role.mention for role in member.roles if role != member.guild.default_role]
+    else:
+        roles = [role.name for role in member.roles if role != member.guild.default_role]
 
     if roles:
         # Discord field values must be ≤ 1024 characters
