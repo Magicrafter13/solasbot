@@ -517,7 +517,7 @@ async def on_message_delete(message: discord.Message):
 @client.event
 async def on_user_update(before: User, after: User):
     """Log changes to user's avatar."""
-    if member.guild.id != client.primary_guild.id or before.avatar == after.avatar:
+    if before.avatar == after.avatar:
         return
 
     embed = discord.Embed(
