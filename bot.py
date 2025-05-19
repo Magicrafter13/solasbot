@@ -495,7 +495,7 @@ async def on_message_edit(before: discord.Message, after: discord.Message):
 @client.event
 async def on_message_delete(message: discord.Message):
     """Log cached message deletions."""
-    if member.guild.id != client.primary_guild.id or message.author.bot:
+    if message.guild.id != client.primary_guild.id or message.author.bot:
         return
 
     embed = discord.Embed(
