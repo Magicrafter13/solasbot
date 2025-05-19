@@ -48,7 +48,7 @@ COLORS = {
 CONN = sqlite3.connect('users.db')
 CURSOR = CONN.cursor()
 # Create tables if they don't exist
-CURSOR.execute('''
+CURSOR.executescript('''
     CREATE TABLE IF NOT EXISTS bans (
         user INT NOT NULL PRIMARY KEY,
         date TIMESTAMP
@@ -276,17 +276,20 @@ async def timeout(
         user,
         f'You have been timed out in {SERVER_NAME}.\nGiven reason:\n> {reason}'
     ):
+        await interaction.channel.send(f'Failed to DM {user}, check logs.')
 
     # Add to database
-    await interaction.channel.send(f'Failed to DM {user}, check logs.')
+    now = datetime.now()
+    delta = SOLAS_TIMEOUTS[time]
+    future = now + delta
     CURSOR.execute(
         '''
             INSERT INTO timeouts
             VALUES (?, ?)
             ON CONFLICT (user) DO
-                UPDATE SET date = date('now');
+                UPDATE SET date = ?;
         ''',
-        (user.id,))
+        (user.id, future, future))
     CONN.commit()
 
     # Timeout user
@@ -295,7 +298,7 @@ async def timeout(
     except NotFound:
         return await interaction.response.send_message(f'User is not a member in {SERVER_NAME}!')
     try:
-        await user.timeout(SOLAS_TIMEOUTS[time], reason=reason)
+        await user.timeout(delta, reason=reason)
     except discord.Forbidden:
         return await interaction.response.send_message(f'Lacking permissions to timeout {user}!')
     except Exception as _e:
@@ -437,6 +440,36 @@ async def on_member_join(member: Member):
         embed.set_image(url=member.avatar.url)
     embed.set_footer(text="Member Event Log Item")
 
+    # Notify first
     await client.logging_channels['member_join'].send(embed=embed)
+
+    # Check if they're in the timeout database - if so, and it hasn't expired, re-timeout
+    CURSOR.execute(
+    '''
+        SELECT *
+        FROM timeouts
+        WHERE user = ?;
+    ''',
+    (member.id,))
+    result = CURSOR.fetchone()
+    if result:
+        _, freedom = result
+        now = datetime.now()
+        freedom = datetime.fromisoformat(freedom)
+        if now < freedom:
+            try:
+                await member.timeout(freedom - now, reason=reason)
+            except discord.Forbidden:
+                await client.logging_channels['member_join'].send(f"Attempting to continue timeout for {member.mention}, but don't have permission to do so!")
+        else:
+            # May as well delete the database entry now
+            CURSOR.execute(
+                '''
+                    DELETE FROM timeouts
+                    WHERE user = ?;
+                ''',
+                (member.id,)
+            )
+            CONN.commit()
 
 client.run(TOKEN)
