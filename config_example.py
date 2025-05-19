@@ -17,6 +17,7 @@ LOGGING = {
     'member_join': (1234567890123456789, 1234567890123456789),  # members joining the primary guild
     'member_leave': (1234567890123456789, 1234567890123456789),  # members leaving the primary guild
     'message_edit': (1234567890123456789, 1234567890123456789),  # message edited in primary guild
+    # WARN: messages_delete is a typo - change to message_delete for next major version change
     'messages_delete': (1234567890123456789, 1234567890123456789),  # message deleted in primary guild
     'member_role': (1234567890123456789, 1234567890123456789),  # member roles modified in primary guild
     'member_nickname': (1234567890123456789, 1234567890123456789),  # member nickname modified in primary guild

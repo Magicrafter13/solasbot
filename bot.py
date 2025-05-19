@@ -26,13 +26,11 @@ DRY_RUN = os.environ.get('DRY_RUN', 'False').lower() == 'true'
 
 intents = Intents.default()
 intents.message_content = True
-intents.messages = True   
+intents.messages = True
 intents.members = True
 #intents.reactions = True
 client = Client(intents=intents)
 tree = app_commands.CommandTree(client)
-
-client.primary_guild: Guild = None
 
 COLORS = {
     'ban': 0xe01b24,
@@ -410,7 +408,8 @@ async def on_ready():
 @client.event
 async def on_member_join(member: Member):
     """Log a member joining the guild."""
-    # TODO: ignore if member is joining a non primary guild
+    if member.guild.id != client.primary_guild.id:
+        return
 
     embed = discord.Embed(
         title='Member Join',
@@ -426,14 +425,15 @@ async def on_member_join(member: Member):
     await client.logging_channels['member_join'].send(embed=embed)
 
 @client.event
-async def on_member_remove(member: discord.Member):
+async def on_member_remove(member: Member):
     """Log a member leaving the guild."""
-    # TODO: ignore if member is leaving a non-primary guild
+    if member.guild.id != client.primary_guild.id:
+        return
 
     embed = discord.Embed(
         title='Member Leave',
         description=f'{member.mention}\n{member.id}: `{member.name}`',
-        colour=COLORS['member_leave'],  
+        colour=COLORS['member_leave'],
         timestamp=datetime.now()
     )
 
@@ -462,7 +462,12 @@ async def on_member_remove(member: discord.Member):
 
 @client.event
 async def on_message_edit(before: discord.Message, after: discord.Message):
-    if before.author.bot or before.content == after.content:
+    """Log changes to cached messages."""
+    if (
+        before.guild.id != client.primary_guild.id or
+        before.author.bot or
+        before.content == after.content
+    ):
         return
 
     embed = discord.Embed(
@@ -478,22 +483,25 @@ async def on_message_edit(before: discord.Message, after: discord.Message):
 
     embed.add_field(name="Before", value=before.content or "*[no content]*", inline=False)
     embed.add_field(name="After", value=after.content or "*[no content]*", inline=False)
-    
-    embed.set_footer(
-        text=f"Message ID: {before.id} | Jump: {after.jump_url}"
-    )
+    embed.add_field(
+        name="Info",
+        value=f"Message ID: {before.id} | [Jump]({after.jump_url})",
+        inline=False)
+
+    embed.set_footer(text='Message Event Log Item')
 
     await client.logging_channels['message_edit'].send(embed=embed)
-    
+
 @client.event
 async def on_message_delete(message: discord.Message):
-    if message.author.bot:
+    """Log cached message deletions."""
+    if member.guild.id != client.primary_guild.id or message.author.bot:
         return
 
     embed = discord.Embed(
         title="Message Deleted",
         color=discord.Color.red(),
-        timestamp=datetime.now()  
+        timestamp=datetime.now()
     )
 
     embed.description = (
@@ -503,13 +511,14 @@ async def on_message_delete(message: discord.Message):
 
     embed.add_field(name="Content", value=message.content or "*[no content]*", inline=False)
     embed.set_footer(text=f"Message ID: {message.id}")
-    
-    await client.logging_channels['message_edit'].send(embed=embed)
-    
+
+    await client.logging_channels['messages_delete'].send(embed=embed)
+
 @client.event
-async def on_user_update(before: discord.User, after: discord.User):
-    if before.avatar == after.avatar:
-        return 
+async def on_user_update(before: User, after: User):
+    """Log changes to user's avatar."""
+    if member.guild.id != client.primary_guild.id or before.avatar == after.avatar:
+        return
 
     embed = discord.Embed(
         title="Avatar Changed",
@@ -524,18 +533,23 @@ async def on_user_update(before: discord.User, after: discord.User):
     embed.description = f"**User:** {after.mention} (`{after}`)\n"
     embed.set_footer(text=f"User ID: {after.id}")
 
-    await client.logging_channels['message_edit'].send(embed=embed)
-    
+    await client.logging_channels['member_avatar'].send(embed=embed)
+
 @client.event
-async def on_member_update(before: discord.Member, after: discord.Member):
+async def on_member_update(before: Member, after: Member):
+    """Log role and nickname changes."""
+    if before.guild.id != client.primary_guild.id:
+        return
+
     if set(before.roles) != set(after.roles):
         await handle_role_change(before, after)
 
     if before.nick != after.nick:
         await handle_nickname_change(before, after)
-        
+
 # Helper functions for multi-responsibility events
-async def handle_role_change(before: discord.Member, after: discord.Member):
+async def handle_role_change(before: Member, after: Member):
+    """Log changes to member roles."""
     before_roles = set(before.roles)
     after_roles = set(after.roles)
 
@@ -565,41 +579,10 @@ async def handle_role_change(before: discord.Member, after: discord.Member):
         )
 
     embed.set_footer(text=f"User ID: {after.id}")
-    await client.logging_channels['message_edit'].send(embed=embed)
+    await client.logging_channels['member_role'].send(embed=embed)
 
-async def handle_role_change(before: discord.Member, after: discord.Member):
-    before_roles = set(before.roles)
-    after_roles = set(after.roles)
-
-    added_roles = after_roles - before_roles
-    removed_roles = before_roles - after_roles
-
-    embed = discord.Embed(
-        title="Role Update",
-        color=discord.Color.blurple(),
-        timestamp=datetime.now()
-    )
-
-    embed.set_author(name=str(after), icon_url=after.display_avatar.url)
-    embed.description = f"**Member:** {after.mention} (`{after}`)"
-
-    if added_roles:
-        embed.add_field(
-            name="Roles Added",
-            value=", ".join(role.mention for role in added_roles),
-            inline=False
-        )
-    if removed_roles:
-        embed.add_field(
-            name="Roles Removed",
-            value=", ".join(role.mention for role in removed_roles),
-            inline=False
-        )
-
-    embed.set_footer(text=f"User ID: {after.id}")
-    await client.logging_channels['message_edit'].send(embed=embed)
-
-async def handle_nickname_change(before: discord.Member, after: discord.Member):
+async def handle_nickname_change(before: Member, after: Member):
+    """Log changes to member nicknames."""
     embed = discord.Embed(
         title="Nickname Changed",
         color=discord.Color.blurple(),
@@ -620,8 +603,7 @@ async def handle_nickname_change(before: discord.Member, after: discord.Member):
     )
 
     embed.set_footer(text=f"User ID: {after.id}")
-    await client.logging_channels['message_edit'].send(embed=embed)
+    await client.logging_channels['member_nickname'].send(embed=embed)
 
 
-    
 client.run(TOKEN)
