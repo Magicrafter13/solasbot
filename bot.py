@@ -594,7 +594,7 @@ async def handle_nickname_change(before: Member, after: Member):
         timestamp=datetime.now()
     )
 
-    embed.set_author(name=str(after), icon_url=after.display_avatar.url)
+    embed.set_author(name=after.global_name, icon_url=after.display_avatar.url)
     embed.description = f"**Member:** {after.mention} (`{after}`)"
     embed.add_field(
         name="Before",
