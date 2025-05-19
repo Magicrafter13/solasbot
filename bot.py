@@ -505,6 +505,122 @@ async def on_message_delete(message: discord.Message):
     embed.set_footer(text=f"Message ID: {message.id}")
     
     await client.logging_channels['message_edit'].send(embed=embed)
+    
+@client.event
+async def on_user_update(before: discord.User, after: discord.User):
+    if before.avatar == after.avatar:
+        return 
+
+    embed = discord.Embed(
+        title="Avatar Changed",
+        color=discord.Color.blurple(),
+        timestamp=datetime.now()
+    )
+
+    embed.set_author(name=str(after), icon_url=after.display_avatar.url)
+    embed.set_thumbnail(url=before.display_avatar.url)
+    embed.set_image(url=after.display_avatar.url)
+
+    embed.description = f"**User:** {after.mention} (`{after}`)\n"
+    embed.set_footer(text=f"User ID: {after.id}")
+
+    await client.logging_channels['message_edit'].send(embed=embed)
+    
+@client.event
+async def on_member_update(before: discord.Member, after: discord.Member):
+    if set(before.roles) != set(after.roles):
+        await handle_role_change(before, after)
+
+    if before.nick != after.nick:
+        await handle_nickname_change(before, after)
+        
+# Helper functions for multi-responsibility events
+async def handle_role_change(before: discord.Member, after: discord.Member):
+    before_roles = set(before.roles)
+    after_roles = set(after.roles)
+
+    added_roles = after_roles - before_roles
+    removed_roles = before_roles - after_roles
+
+    embed = discord.Embed(
+        title="Role Update",
+        color=discord.Color.blurple(),
+        timestamp=datetime.now()
+    )
+
+    embed.set_author(name=str(after), icon_url=after.display_avatar.url)
+    embed.description = f"**Member:** {after.mention} (`{after}`)"
+
+    if added_roles:
+        embed.add_field(
+            name="Roles Added",
+            value=", ".join(role.mention for role in added_roles),
+            inline=False
+        )
+    if removed_roles:
+        embed.add_field(
+            name="Roles Removed",
+            value=", ".join(role.mention for role in removed_roles),
+            inline=False
+        )
+
+    embed.set_footer(text=f"User ID: {after.id}")
+    await client.logging_channels['message_edit'].send(embed=embed)
+
+async def handle_role_change(before: discord.Member, after: discord.Member):
+    before_roles = set(before.roles)
+    after_roles = set(after.roles)
+
+    added_roles = after_roles - before_roles
+    removed_roles = before_roles - after_roles
+
+    embed = discord.Embed(
+        title="Role Update",
+        color=discord.Color.blurple(),
+        timestamp=datetime.now()
+    )
+
+    embed.set_author(name=str(after), icon_url=after.display_avatar.url)
+    embed.description = f"**Member:** {after.mention} (`{after}`)"
+
+    if added_roles:
+        embed.add_field(
+            name="Roles Added",
+            value=", ".join(role.mention for role in added_roles),
+            inline=False
+        )
+    if removed_roles:
+        embed.add_field(
+            name="Roles Removed",
+            value=", ".join(role.mention for role in removed_roles),
+            inline=False
+        )
+
+    embed.set_footer(text=f"User ID: {after.id}")
+    await client.logging_channels['message_edit'].send(embed=embed)
+
+async def handle_nickname_change(before: discord.Member, after: discord.Member):
+    embed = discord.Embed(
+        title="Nickname Changed",
+        color=discord.Color.blurple(),
+        timestamp=datetime.now()
+    )
+
+    embed.set_author(name=str(after), icon_url=after.display_avatar.url)
+    embed.description = f"**Member:** {after.mention} (`{after}`)"
+    embed.add_field(
+        name="Before",
+        value=before.nick or "*None*",
+        inline=True
+    )
+    embed.add_field(
+        name="After",
+        value=after.nick or "*None*",
+        inline=True
+    )
+
+    embed.set_footer(text=f"User ID: {after.id}")
+    await client.logging_channels['message_edit'].send(embed=embed)
 
 
     
