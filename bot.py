@@ -29,7 +29,7 @@ intents.message_content = True
 intents.messages = True
 intents.members = True
 #intents.reactions = True
-client = Client(intents=intents)
+client = Client(intents=intents, max_messages=5000)
 tree = app_commands.CommandTree(client)
 
 COLORS = {
@@ -156,7 +156,9 @@ async def ban(interaction: Interaction, user: User, type: str, reason: Optional[
             )
 
     # DM banee
+    got_dm = True
     if dm_message != '' and not await send_dm(user, dm_message):
+        got_dm = False
         await interaction.channel.send(f'Failed to DM {user}, check logs.')
 
     # Add to database
@@ -198,7 +200,7 @@ async def ban(interaction: Interaction, user: User, type: str, reason: Optional[
     await log_action(
         action,
         interaction.user,
-        info=f'user banned: {user_info}\nreason:\n> {reason}',
+        info=f"user banned: {user_info}\nreason:\n> {reason}\nSuccessfully DM'd: {got_dm}",
         color=COLORS['ban'])
     return await interaction.response.send_message(
         f'Banned {user_info} with reason `{reason}`.')
@@ -211,10 +213,12 @@ async def kick(interaction: Interaction, user: Member|User, reason: Optional[str
         return
 
     # DM kickee
+    got_dm = True
     if not await send_dm(
         user,
         f'You have been kicked from {SERVER_NAME}.\nGiven reason:\n> {reason}'
     ):
+        got_dm = False
         await interaction.channel.send(f'Failed to DM {user}, check logs.')
 
     # Kick user
@@ -232,7 +236,7 @@ async def kick(interaction: Interaction, user: Member|User, reason: Optional[str
     await log_action(
         'kick',
         interaction.user,
-        info=f'user kicked: {user_info}\nreason:\n> {reason}',
+        info=f"user kicked: {user_info}\nreason:\n> {reason}\nSuccessfully DM'd: {got_dm}",
         color=COLORS['kick'])
     return await interaction.response.send_message(
         f'Kicked {user_info} with reason `{reason}`.')
@@ -267,10 +271,12 @@ async def timeout(
         return
 
     # DM rascal
+    got_dm = True
     if not await send_dm(
         user,
         f'You have been timed out in {SERVER_NAME}.\nGiven reason:\n> {reason}'
     ):
+        got_dm = False
         await interaction.channel.send(f'Failed to DM {user}, check logs.')
 
     # Timeout user
@@ -290,7 +296,7 @@ async def timeout(
     await log_action(
         'timeout',
         interaction.user,
-        info=f'user timed out: {user_info}\nlength of time: {time}\nreason:\n> {reason}',
+        info=f"user timed out: {user_info}\nlength of time: {time}\nreason:\n> {reason}\nSuccessfully DM'd: {got_dm}",
         color=COLORS['timeout'])
     return await interaction.response.send_message(
         f'Timed out {user_info} for {time} with reason `{reason}`.')
