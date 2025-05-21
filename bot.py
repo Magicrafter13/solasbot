@@ -585,11 +585,19 @@ async def handle_role_change(before: Member, after: Member):
                 inline=False
             )
     if removed_roles:
-        embed.add_field(
-            name="Roles Removed",
-            value=", ".join(role.mention for role in removed_roles),
-            inline=False
-        )
+        # Use role mentions if logging in the same server, otherwise resort to display names
+        if client.logging_channels['member_role'].id == client.primary_guild.id:
+            embed.add_field(
+                name="Roles Removed",
+                value=", ".join(role.mention for role in removed_roles),
+                inline=False
+            )
+        else:
+            embed.add_field(
+                name="Roles Removed",
+                value=", ".join(role.name for role in removed_roles),
+                inline=False
+            )
 
     embed.set_footer(text=f"User ID: {after.id}")
     await client.logging_channels['member_role'].send(embed=embed)
