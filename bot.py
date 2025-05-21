@@ -571,11 +571,19 @@ async def handle_role_change(before: Member, after: Member):
     embed.description = f"**Member:** {after.mention} (`{after}`)"
 
     if added_roles:
-        embed.add_field(
-            name="Roles Added",
-            value=", ".join(role.mention for role in added_roles),
-            inline=False
-        )
+        # Use role mentions if logging in the same server, otherwise resort to display names
+        if client.logging_channels['member_role'].id == client.primary_guild.id:
+            embed.add_field(
+                name="Roles Added",
+                value=", ".join(role.mention for role in added_roles),
+                inline=False
+            )
+        else:
+            embed.add_field(
+                name="Roles Added",
+                value=", ".join(role.name for role in added_roles),
+                inline=False
+            )
     if removed_roles:
         embed.add_field(
             name="Roles Removed",
