@@ -128,10 +128,10 @@ async def log_action(action: str, user: Member, info: Optional[str]='', color: O
 
 # Bot commands
 
-@tree.command(name='ban', description='6 month ban')
+@tree.command(name='ban', description='3 month ban')
 @app_commands.describe(user='Username to ban.', type='Type of ban to issue.', reason='Optional, additional, reason for banning (will be sent to the banned user).')
 @app_commands.choices(type=[
-    app_commands.Choice(name='6-month ban (class 1 infraction).', value='ban'),
+    app_commands.Choice(name='3-month ban (class 1 infraction).', value='ban'),
     app_commands.Choice(name="Bot/Spam/Scam account perma-ban (doesn't DM reason, deletes 7-days of their messages).", value='spam'),
     app_commands.Choice(name='Permanently ban a regular user (blacklist).', value='blacklist')
 ])
@@ -144,7 +144,7 @@ async def ban(interaction: Interaction, user: User, type: str, reason: Optional[
     match type:
         case 'ban':
             dm_message = (
-                f'You have receive a 6-month ban from {SERVER_NAME}.\n'
+                f'You have receive a 3-month ban from {SERVER_NAME}.\n'
                 'Given reason:\n'
                 f'> {reason}'
             )
@@ -194,7 +194,7 @@ async def ban(interaction: Interaction, user: User, type: str, reason: Optional[
     action = 'ban'
     match type:
         case 'ban':
-            action = '6-month ban'
+            action = '3-month ban'
         case 'blacklist':
             action = 'blacklist'
     await log_action(
@@ -376,7 +376,7 @@ async def unban_users():
         CURSOR.execute('''
             SELECT *
             FROM bans
-            WHERE date < datetime('now', '-6 months');
+            WHERE date < datetime('now', '-3 months');
         ''')
         pardons = CURSOR.fetchall()
         for user_id, _ in pardons:
@@ -384,12 +384,12 @@ async def unban_users():
             try:
                 await client.primary_guild.unban(
                     await client.fetch_user(user_id),
-                    reason='6-month ban expired')
+                    reason='3-month ban expired')
                 user_info = f'<@{user_id}> (`{user_id}`)'
                 await log_action(
                     'unban',
                     client.user,
-                    f'user unbanned: {user_info}\nreason:\n> 6-month ban has expired')
+                    f'user unbanned: {user_info}\nreason:\n> 3-month ban has expired')
             except discord.NotFound:
                 logging.warning("User wasn't banned!")
             remove_from_db(user)
