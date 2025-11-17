@@ -558,6 +558,17 @@ async def on_member_update(before: Member, after: Member):
     if before.nick != after.nick:
         await handle_nickname_change(before, after)
 
+@client.event
+async def on_member_ban(guild: Guild, user: User):
+    """Log members not banned through the bot."""
+    entry, _ = [entry async for entry in guild.audit_logs(limit=1, action=discord.AuditLogAction.ban)]
+    if entry.user != client.user and entry.target == user:
+        return await log_action(
+            'ban',
+            entry.user,
+            info=f"{entry.user.mention} possibly banned {user.mention} (`{user.id}`)",
+            color=COLORS['ban'])
+
 # Helper functions for multi-responsibility events
 async def handle_role_change(before: Member, after: Member):
     """Log changes to member roles."""
