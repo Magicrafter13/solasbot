@@ -560,14 +560,16 @@ async def on_member_update(before: Member, after: Member):
 
 @client.event
 async def on_member_ban(guild: Guild, user: User):
-    """Log members not banned through the bot."""
-    entry, _ = [entry async for entry in guild.audit_logs(limit=1, action=discord.AuditLogAction.ban)]
-    if entry.user != client.user and entry.target == user:
-        return await log_action(
-            'ban',
-            entry.user,
-            info=f"{entry.user.mention} possibly banned {user.mention} (`{user.id}`)",
-            color=COLORS['ban'])
+    """Log members not banned through the bot."""
+    entries = [entry async for entry in guild.audit_logs(limit=1, action=discord.AuditLogAction.ban)]
+    if entries:
+        entry = entries[0]
+        if entry.user != client.user and entry.target == user:
+            return await log_action(
+                'ban',
+                entry.user,
+                info=f"{entry.user.mention} possibly banned {user.mention} (`{user.id}`)",
+                color=COLORS['ban'])
 
 # Helper functions for multi-responsibility events
 async def handle_role_change(before: Member, after: Member):
