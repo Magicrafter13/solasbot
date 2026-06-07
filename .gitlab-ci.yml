@@ -7,6 +7,7 @@ docker-build-self:
     DOCKER_IMAGE_NAME: $CI_REGISTRY_IMAGE:$CI_COMMIT_REF_SLUG
   before_script:
     - echo "$CI_REGISTRY_PASSWORD" | docker login -u "$CI_REGISTRY_USER" --password-stdin $CI_REGISTRY
+    - echo "$DOCKER_PAT" | docker login dhi.io -u "$DOCKER_USERNAME" --password-stdin
   script:
     - |
       if [[ -n "$CI_COMMIT_TAG" ]]; then
