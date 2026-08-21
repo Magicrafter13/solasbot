@@ -162,11 +162,12 @@ async def ban(interaction: Interaction, user: User, type: str, reason: Optional[
                 f'> {reason}'
             )
 
+    await interaction.response.defer()
+
     # DM banee
     got_dm = True
     if dm_message != '' and not await send_dm(user, dm_message):
         got_dm = False
-        await interaction.channel.send(f'Failed to DM {user}, check logs.')
 
     # Add to database
     if type == 'ban':
@@ -192,7 +193,7 @@ async def ban(interaction: Interaction, user: User, type: str, reason: Optional[
             reason=reason,
             delete_message_seconds=(604800 if type == 'spam' else 0))
     except discord.errors.Forbidden:
-        return await interaction.response.send_message(f'Lacking permissions to ban {user}!')
+        return await interaction.followup.send(f'I lack permissions to ban {user}!')
     except Exception as _e:
         return logging.error('EXCEPTION IN /ban:\n%s', _e)
 
@@ -209,8 +210,9 @@ async def ban(interaction: Interaction, user: User, type: str, reason: Optional[
         interaction.user,
         info=f"user banned: {user_info}\nreason:\n> {reason}\nSuccessfully DM'd: {got_dm}",
         color=COLORS['ban'])
-    return await interaction.response.send_message(
+    await interaction.followup.send(
         f'Banned {user_info} with reason `{reason}`.')
+    return await interaction.followup.send(f'Failed to DM {user}, check logs.')
 
 @tree.command(name='kick', description='Kick someone from the server.')
 @app_commands.describe(user='Member to kick.', reason='Optional reason for kicking.')
@@ -219,6 +221,8 @@ async def kick(interaction: Interaction, user: Member|User, reason: Optional[str
     if await try_authorization(interaction, user) is False:
         return
 
+    await interaction.response.defer()
+
     # DM kickee
     got_dm = True
     if not await send_dm(
@@ -226,7 +230,6 @@ async def kick(interaction: Interaction, user: Member|User, reason: Optional[str
         f'You have been kicked from {SERVER_NAME}.\nGiven reason:\n> {reason}'
     ):
         got_dm = False
-        await interaction.channel.send(f'Failed to DM {user}, check logs.')
 
     # Kick user
     if DRY_RUN:
@@ -234,7 +237,7 @@ async def kick(interaction: Interaction, user: Member|User, reason: Optional[str
     try:
         await client.primary_guild.kick(user, reason=reason)
     except discord.errors.Forbidden:
-        return await interaction.response.send_message(f'Lacking permissions to kick {user}!')
+        return await interaction.followup.send(f'I lack permissions to kick {user}!')
     except Exception as _e:
         return logging.error('EXCEPTION IN /kick:\n%s', _e)
 
@@ -245,8 +248,9 @@ async def kick(interaction: Interaction, user: Member|User, reason: Optional[str
         interaction.user,
         info=f"user kicked: {user_info}\nreason:\n> {reason}\nSuccessfully DM'd: {got_dm}",
         color=COLORS['kick'])
-    return await interaction.response.send_message(
+    await interaction.followup.send(
         f'Kicked {user_info} with reason `{reason}`.')
+    return await interaction.followup.send(f'Failed to DM {user}, check logs.')
 
 SOLAS_TIMEOUTS = {
     '1h': timedelta(hours=1),
@@ -277,6 +281,8 @@ async def timeout(
     if await try_authorization(interaction, user) is False:
         return
 
+    await interaction.response.defer()
+
     # DM rascal
     got_dm = True
     if not await send_dm(
@@ -284,7 +290,6 @@ async def timeout(
         f'You have been timed out in {SERVER_NAME}.\nGiven reason:\n> {reason}'
     ):
         got_dm = False
-        await interaction.channel.send(f'Failed to DM {user}, check logs.')
 
     # Add to database
     sqlite_time_string = f'+{SOLAS_TIMEOUTS[time].total_seconds()} seconds'
@@ -299,26 +304,33 @@ async def timeout(
     CONN.commit()
 
     # Timeout user
+    user = None
     try:
         user = await client.primary_guild.fetch_member(user.id)
     except discord.errors.NotFound:
-        return await interaction.response.send_message(f'User is not a member in {SERVER_NAME}!')
-    try:
-        await user.timeout(SOLAS_TIMEOUTS[time], reason=reason)
-    except discord.errors.Forbidden:
-        return await interaction.response.send_message(f'Lacking permissions to timeout {user}!')
-    except Exception as _e:
-        return logging.error('EXCEPTION IN /timeout:\n%s', _e)
+        await interaction.followup.send(f'User is not a member in {SERVER_NAME}, added to database only.')
+    if user:
+        try:
+            await user.timeout(SOLAS_TIMEOUTS[time], reason=reason)
+        except discord.errors.Forbidden:
+            return await interaction.followup.send(f'I lack permissions to timeout {user}!')
+        except Exception as _e:
+            return logging.error('EXCEPTION IN /timeout:\n%s', _e)
 
     user_info = f'{user.mention} (`{user.id}`)'
 
     await log_action(
         'timeout',
         interaction.user,
-        info=f"user timed out: {user_info}\nlength of time: {time}\nreason:\n> {reason}\nSuccessfully DM'd: {got_dm}",
+        info=(
+            f"user timed out: {user_info}\n"
+            f"length of time: {time}\n"
+            f"reason:\n"
+            f"> {reason}\nSuccessfully DM'd: {got_dm}"),
         color=COLORS['timeout'])
-    return await interaction.response.send_message(
+    await interaction.followup.send(
         f'Timed out {user_info} for {time} with reason `{reason}`.')
+    return await interaction.followup.send(f'Failed to DM {user}, check logs.')
 
 @tree.command(name='clear', description='Delete all the messages in the current channel.')
 async def clear(interaction: Interaction):
