@@ -51,7 +51,14 @@ CURSOR.execute('''
     CREATE TABLE IF NOT EXISTS bans (
         user INT NOT NULL PRIMARY KEY,
         date TIMESTAMP
-    );''')
+    );
+''')
+CURSOR.execute('''
+    CREATE TABLE IF NOT EXISTS timeouts (
+        user INT NOT NULL PRIMARY KEY,
+        date TIMESTAMP
+    );
+''')
 
 # Helper functions
 
@@ -62,7 +69,7 @@ async def try_authorization(interaction: Interaction, user: Optional[Member | Us
         try:
             member = await client.primary_guild.fetch_member(user.id)
             user = member
-        except discord.NotFound:
+        except discord.errors.NotFound:
             return True
 
     # user is now type Member
@@ -92,18 +99,18 @@ async def send_dm(user: User, message: str) -> bool:
         if not user.dm_channel:
             dm = await user.create_dm()
         await dm.send(message)
-    except discord.HTTPException as _e:
-        print(_e)
+    except discord.errors.HTTPException as _e:
+        logging.error(_e)
         return False
-    except discord.Forbidden as _e:
-        print(_e)
+    except discord.errors.Forbidden as _e:
+        logging.error(_e)
         return False
-    except discord.NotFound as _e:
-        print(_e)
+    except discord.errors.NotFound as _e:
+        logging.error(_e)
         return False
     return True
 
-def remove_from_db(user: User):
+def remove_from_ban_db(user: User):
     """Remove a user.id from the SQLite database."""
     CURSOR.execute(
         '''
@@ -174,7 +181,7 @@ async def ban(interaction: Interaction, user: User, type: str, reason: Optional[
         CONN.commit()
     # Remove from database if permanent ban and already there
     else:
-        remove_from_db(user)
+        remove_from_ban_db(user)
 
     # Ban user
     if DRY_RUN:
@@ -184,10 +191,10 @@ async def ban(interaction: Interaction, user: User, type: str, reason: Optional[
             user,
             reason=reason,
             delete_message_seconds=(604800 if type == 'spam' else 0))
-    except discord.Forbidden:
+    except discord.errors.Forbidden:
         return await interaction.response.send_message(f'Lacking permissions to ban {user}!')
     except Exception as _e:
-        return print(f'EXCEPTION IN /ban:\n{_e}')
+        return logging.error('EXCEPTION IN /ban:\n%s', _e)
 
     user_info = f'{user.mention} (`{user.id}`)'
 
@@ -226,10 +233,10 @@ async def kick(interaction: Interaction, user: Member|User, reason: Optional[str
         return
     try:
         await client.primary_guild.kick(user, reason=reason)
-    except discord.Forbidden:
+    except discord.errors.Forbidden:
         return await interaction.response.send_message(f'Lacking permissions to kick {user}!')
     except Exception as _e:
-        return print(f'EXCEPTION IN /kick:\n{_e}')
+        return logging.error('EXCEPTION IN /kick:\n%s', _e)
 
     user_info = f'{user.mention} (`{user.id}`)'
 
@@ -279,17 +286,29 @@ async def timeout(
         got_dm = False
         await interaction.channel.send(f'Failed to DM {user}, check logs.')
 
+    # Add to database
+    sqlite_time_string = f'+{SOLAS_TIMEOUTS[time].total_seconds()} seconds'
+    CURSOR.execute(
+        '''
+            INSERT INTO timeouts
+            VALUES (?, datetime('now', ?))
+            ON CONFLICT (user) DO
+                UPDATE SET date = datetime('now', ?);
+        ''',
+        (user.id, sqlite_time_string, sqlite_time_string))
+    CONN.commit()
+
     # Timeout user
     try:
         user = await client.primary_guild.fetch_member(user.id)
-    except NotFound:
+    except discord.errors.NotFound:
         return await interaction.response.send_message(f'User is not a member in {SERVER_NAME}!')
     try:
         await user.timeout(SOLAS_TIMEOUTS[time], reason=reason)
-    except discord.Forbidden:
+    except discord.errors.Forbidden:
         return await interaction.response.send_message(f'Lacking permissions to timeout {user}!')
     except Exception as _e:
-        return print(f'EXCEPTION IN /timeout:\n{_e}')
+        return logging.error('EXCEPTION IN /timeout:\n%s', _e)
 
     user_info = f'{user.mention} (`{user.id}`)'
 
@@ -319,9 +338,9 @@ async def clear(interaction: Interaction):
     try:
         async for message in interaction.channel.history(limit=None, oldest_first=True):
             await message.delete()
-    except discord.Forbidden:
+    except discord.errors.Forbidden:
         return await interaction.followup.send('Unable to delete message(s).', ephemeral=True)
-    except discord.HTTPException:
+    except discord.errors.HTTPException:
         return await interaction.followup.send('Unable to delete message(s).', ephemeral=True)
 
     await log_action(
@@ -340,15 +359,15 @@ async def unban(interaction: Interaction, user: User, reason: Optional[str]):
     if await try_authorization(interaction, user) is False:
         return
 
-    remove_from_db(user)
+    remove_from_ban_db(user)
 
     # Unban user
     try:
         await client.primary_guild.unban(user, reason=reason)
-    except discord.Forbidden:
+    except discord.errors.Forbidden:
         return await interaction.response.send_message(f'Lacking permissions to unban {user}!')
     except Exception as _e:
-        return print(f'EXCEPTION IN /unban:\n{_e}')
+        return logging.error('EXCEPTION IN /unban:\n%s', _e)
 
     user_info = f'{user.mention} (`{user.id}`)'
 
@@ -362,16 +381,18 @@ async def unban(interaction: Interaction, user: User, reason: Optional[str]):
 
 # Non commands
 
-async def unban_users():
-    """Wait until midnight, then unban relevant users."""
+async def restore_users():
+    """Wait until midnight, then unban or remove timeouts on relevant users."""
     while True:
         now = datetime.now()
         target = now.replace(hour=0, minute=0, second=0, microsecond=0)
         if now >= target:
             target += timedelta(days=1)
         sleep_seconds = (target - now).total_seconds()
-        logging.info('Waiting %s seconds before checking bans...', sleep_seconds)
+        logging.info('Waiting %s seconds before checking bans and timeouts...', sleep_seconds)
         await asyncio.sleep(sleep_seconds)
+
+        # Unban users
         logging.info('Getting list of users to be unbanned')
         CURSOR.execute('''
             SELECT *
@@ -390,9 +411,16 @@ async def unban_users():
                     'unban',
                     client.user,
                     f'user unbanned: {user_info}\nreason:\n> 3-month ban has expired')
-            except discord.NotFound:
+            except discord.errors.NotFound:
                 logging.warning("User wasn't banned!")
-            remove_from_db(user)
+            remove_from_ban_db(user)
+
+        # Remove old timeouts from database
+        logging.info('Getting list of users to remove timeouts from')
+        CURSOR.execute('''
+            DELETE FROM timeouts
+            WHERE date < datetime('now');
+        ''')
 
 # Events
 
@@ -401,10 +429,14 @@ async def on_ready():
     """Initialize bot data and tasks."""
     logging.info('Logged in as %s.', client.user)
     client.primary_guild = await client.fetch_guild(PRIMARY_GUILD["id"])
-    client.logging_channels = {
-        log_type: await (await client.fetch_guild(guild_id)).fetch_channel(channel_id)
-        for log_type, (guild_id, channel_id) in LOGGING.items()}
-    client.loop.create_task(unban_users())
+    try:
+        client.logging_channels = {
+            log_type: await (await client.fetch_guild(guild_id)).fetch_channel(channel_id)
+            for log_type, (guild_id, channel_id) in LOGGING.items()}
+    except discord.errors.NotFound as _e:
+        logging.error('Unable to fetch guild or channel!\n%s', _e)
+        raise
+    client.loop.create_task(restore_users())
     await asyncio.sleep(5)
     await client.change_presence(activity=discord.Activity(
         type=discord.ActivityType.watching,
@@ -413,10 +445,11 @@ async def on_ready():
 
 @client.event
 async def on_member_join(member: Member):
-    """Log a member joining the guild."""
+    """Log a member joining the guild, timeout if necessary."""
     if member.guild.id != client.primary_guild.id:
         return
 
+    # Generate embed
     embed = discord.Embed(
         title='Member Join',
         description=f'{member.mention}\n{member.id}: `{member.name}`',
@@ -428,7 +461,28 @@ async def on_member_join(member: Member):
         embed.set_image(url=member.avatar.url)
     embed.set_footer(text="Member Event Log Item")
 
+    # Send log
     await client.logging_channels['member_join'].send(embed=embed)
+
+    # Check if user should be timed out
+    CURSOR.execute(
+        '''
+            SELECT *
+            FROM timeouts
+            WHERE user = ?;
+        ''',
+        (member.id,)
+    )
+    _, timeout_end = CURSOR.fetchone()
+    if timeout_end > datetime.now():
+        logging.info('Reactivating timeout for %s...', member.id)
+        # should try/except but I don't know which errors to ignore, so let's
+        # wait for one to happen
+        await (await client.fetch_user(member.id)).timeout(
+            timeout_end - datetime.now(),
+            reason=(
+                'Your timeout is in effect! '
+                'Please do not leave and re-join the server.'))
 
 @client.event
 async def on_member_remove(member: Member):
