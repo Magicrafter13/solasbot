@@ -19,7 +19,7 @@ LABEL org.opencontainers.image.authors="self@matthewrease.net"
 
 # Package Files
 
-COPY --from=builder /opt/python /opt/python
+COPY --from=builder /usr/lib/python3.14 /usr/lib/python3.14
 
 # App Files
 
