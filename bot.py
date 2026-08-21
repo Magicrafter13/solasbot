@@ -304,12 +304,13 @@ async def timeout(
     CONN.commit()
 
     # Timeout user
+    is_member = False
     try:
         user = await client.primary_guild.fetch_member(user.id)
+        is_member = True
     except discord.errors.NotFound:
         await interaction.followup.send(f'User is not a member in {SERVER_NAME}, added to database only.')
-        user = None
-    if user:
+    if is_member:
         try:
             await user.timeout(SOLAS_TIMEOUTS[time], reason=reason)
         except discord.errors.Forbidden:
